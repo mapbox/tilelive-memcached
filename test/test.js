@@ -1,6 +1,6 @@
 var assert = require('assert');
-var Memcached = require('../node_modules/memcached');
 var Memsource = require('../index');
+var Memcached = Memsource.Memcached;
 
 var now = new Date;
 var tiles = {

@@ -60,6 +60,8 @@ function Source(uri, callback) {
     return callback && callback(null, this);
 };
 
+Source.Memcached = Memcached;
+
 Source.prototype.get = function(format, z, x, y, callback) {
     var key = 'TL-' + format + '-' + this._cachekey + '-' + z + '/' + x + '/' + y;
     var method = format === 'grid' ? 'getGrid' : 'getTile';

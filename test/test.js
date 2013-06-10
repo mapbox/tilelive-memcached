@@ -1,5 +1,5 @@
 var assert = require('assert');
-var Memcache = require('../node_modules/memcache').Client;
+var Memcached = require('../node_modules/memcached');
 var Memsource = require('../index');
 
 var now = new Date;
@@ -57,12 +57,6 @@ describe('load', function() {
             done();
         });
     });
-    it('fails to connect to bad port', function(done) {
-        new Memsource({ backend: new Testsource, port: 50 }, function(err) {
-            assert.equal(err.code, 'ECONNREFUSED');
-            done();
-        });
-    });
     it('loads + sets default values', function(done) {
         var source = new Memsource({ backend: new Testsource });
         assert.ok(source);
@@ -70,7 +64,6 @@ describe('load', function() {
         assert.ok(source._backend);
         assert.ok(source._cachekey);
         assert.ok(source._client);
-        assert.ok(source._client.conn); // @TODO why is this here?
         assert.equal(source._expires, 300);
         done();
     });
@@ -79,7 +72,6 @@ describe('load', function() {
             assert.ifError(err);
             assert.ok(source);
             assert.ok(source._client);
-            assert.ok(source._client.conn);
             done();
         });
     });
@@ -91,7 +83,7 @@ describe('load', function() {
         });
     });
     it('sets client from uri', function(done) {
-        var client = new Memcache();
+        var client = new Memcached('127.0.0.1:11211');
         new Memsource({ backend: new Testsource, client: client}, function(err, source) {
             assert.ifError(err);
             assert.strictEqual(source._client, client);

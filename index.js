@@ -1,5 +1,5 @@
 var crypto = require('crypto');
-var Memcache = require('memcache').Client;
+var Memcached = require('memcached');
 
 module.exports = Source;
 
@@ -49,7 +49,7 @@ function Source(uri, callback) {
 
     this._uri = uri;
     this._expires = typeof uri.expires !== 'undefined' ? uri.expires : 300;
-    this._client = uri.client || new Memcache(uri.port, uri.host);
+    this._client = uri.client || new Memcached('127.0.0.1:11211');
     this._backend = uri.backend;
 
     // @TODO determine if backend cachekey generation is stable.
@@ -57,22 +57,7 @@ function Source(uri, callback) {
         .update(JSON.stringify(uri.backend))
         .digest('hex');
 
-    // Client is already connected.
-    if (this._client.conn) return callback(null, this);
-
-    var once = false;
-    this._client.once('connect', function() {
-        if (once) return;
-        once = true;
-        return callback && callback(null, this);
-    }.bind(this));
-    this._client.once('error', function(err) {
-        if (once) return;
-        once = true;
-        return callback && callback(err);
-    });
-    this._client.connect();
-    // @TODO close, timeout events?
+    return callback && callback(null, this);
 };
 
 Source.prototype.get = function(format, z, x, y, callback) {
@@ -97,10 +82,10 @@ Source.prototype.get = function(format, z, x, y, callback) {
         backend[method](z, x, y, function(err, buffer, headers) {
             if (err && !/(Tile|Grid) does not exist/.test(err.message)) return callback(err);
 
-            source._client.set(key, encode(err, buffer, headers), function(cacheErr) {
+            source._client.set(key, encode(err, buffer, headers), source._expires, function(cacheErr) {
                 if (cacheErr) return callback(cacheErr);
                 return callback(err, buffer, headers);
-            }, source._expires);
+            });
         });
     });
 };

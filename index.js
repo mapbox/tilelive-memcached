@@ -54,13 +54,32 @@ function Source(uri, callback) {
 
     // @TODO determine if backend cachekey generation is stable.
     this._cachekey = crypto.createHash('md5')
-        .update(JSON.stringify(uri.backend))
+        .update(JSON.stringify(uri.backend.data || uri.backend))
         .digest('hex');
+
+    // Proxy backend data key.
+    this.data = this._backend.data || {};
+
+    // @TODO massive hack to avoid conflict with tilelive-s3's
+    // interpretation of 'maskLevel' key. Fix this by removing
+    // masking entirely from the next version of tilelive-s3.
+    if (this._backend.data && this._backend.data.maskLevel) {
+        this.data._maskLevel = this._backend.data.maskLevel;
+        delete this._backend.data.maskLevel;
+    }
 
     return callback && callback(null, this);
 };
 
 Source.Memcached = Memcached;
+
+Source.registerProtocols = function(tilelive) {
+    tilelive.protocols['memcached:'] = Source;
+};
+
+Source.findID = function(filepath, id, callback) {
+    return callback(new Error('id not found'));
+};
 
 Source.prototype.get = function(format, z, x, y, callback) {
     var key = 'TL-' + format + '-' + this._cachekey + '-' + z + '/' + x + '/' + y;

@@ -65,7 +65,8 @@ function Source(uri, callback) {
         delete this._backend.data.maskLevel;
     }
 
-    return callback && callback(null, this);
+    callback && callback(null, this);
+    return undefined;
 };
 
 Source.Memcached = Memcached;

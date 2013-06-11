@@ -120,3 +120,53 @@ Source.prototype.getTile = function(z, x, y, callback) {
 Source.prototype.getGrid = function(z, x, y, callback) {
     this.get('grid', z, x, y, callback);
 };
+
+// Carmen search method.
+Source.prototype.search = function(query, id, callback) {
+    var key = 'TL-search-' + this._cachekey + (id
+        ? '-id-' + encodeURI(id)
+        : '-query-' + encodeURI(query));
+    var source = this;
+    var backend = this._backend;
+    this._client.get(key, function(err, encoded) {
+        if (err) return callback(err);
+
+        // Cache hit.
+        if (encoded) try {
+            return callback(null, JSON.parse(encoded));
+        } catch(err) { return callback(err); }
+
+        // Cache miss.
+        backend.search(query, id, function(err, docs) {
+            if (err) return callback(err);
+            source._client.set(key, JSON.stringify(docs), source._expires, function(cacheErr) {
+                if (cacheErr) return callback(cacheErr);
+                return callback(err, docs);
+            });
+        });
+    });
+};
+
+// Carmen feature method.
+Source.prototype.feature = function(id, callback, raw) {
+    var key = 'TL-feature-' + this._cachekey + (raw ? '-raw-' : '-') + id;
+    var source = this;
+    var backend = this._backend;
+    this._client.get(key, function(err, encoded) {
+        if (err) return callback(err);
+
+        // Cache hit.
+        if (encoded) try {
+            return callback(null, JSON.parse(encoded));
+        } catch(err) { return callback(err); }
+
+        // Cache miss.
+        backend.feature(id, function(err, data) {
+            if (err) return callback(err);
+            source._client.set(key, JSON.stringify(data), source._expires, function(cacheErr) {
+                if (cacheErr) return callback(cacheErr);
+                return callback(err, data);
+            });
+        }, raw);
+    });
+};

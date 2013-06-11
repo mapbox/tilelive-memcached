@@ -57,8 +57,17 @@ describe('load', function() {
             done();
         });
     });
+    it('fails without cachekey', function(done) {
+        new Memsource({ backend: new Testsource }, function(err) {
+            assert.equal(err.message, 'No cachekey');
+            done();
+        });
+    });
     it('loads + sets default values', function(done) {
-        var source = new Memsource({ backend: new Testsource });
+        var source = new Memsource({
+            backend: new Testsource,
+            cachekey: 'test'
+        });
         assert.ok(source);
         assert.ok(source._uri);
         assert.ok(source._backend);
@@ -68,7 +77,10 @@ describe('load', function() {
         done();
     });
     it('loads async', function(done) {
-        new Memsource({ backend: new Testsource }, function(err, source) {
+        new Memsource({
+            backend: new Testsource,
+            cachekey: 'test'
+        }, function(err, source) {
             assert.ifError(err);
             assert.ok(source);
             assert.ok(source._client);
@@ -76,7 +88,11 @@ describe('load', function() {
         });
     });
     it('sets expires from uri', function(done) {
-        new Memsource({ backend: new Testsource, expires: 5 }, function(err, source) {
+        new Memsource({
+            backend: new Testsource,
+            cachekey: 'test',
+            expires: 5
+        }, function(err, source) {
             assert.ifError(err);
             assert.equal(source._expires, 5);
             done();
@@ -84,7 +100,11 @@ describe('load', function() {
     });
     it('sets client from uri', function(done) {
         var client = new Memcached('127.0.0.1:11211');
-        new Memsource({ backend: new Testsource, client: client}, function(err, source) {
+        new Memsource({
+            backend: new Testsource,
+            cachekey: 'test',
+            client: client
+        }, function(err, source) {
             assert.ifError(err);
             assert.strictEqual(source._client, client);
             done();
@@ -129,6 +149,7 @@ describe('api', function() {
     before(function(done) {
         new Memsource({
             backend: new Testsource,
+            cachekey: 'test',
             expires: 1
         }, function(err, memsource) {
             if (err) throw err;
@@ -179,6 +200,7 @@ describe('expires', function() {
     before(function(done) {
         new Memsource({
             backend: new Testsource,
+            cachekey: 'test',
             expires: 1
         }, function(err, memsource) {
             if (err) throw err;

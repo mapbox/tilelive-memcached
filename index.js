@@ -46,16 +46,13 @@ var decode = function(encoded) {
 
 function Source(uri, callback) {
     if (!uri.backend) return callback && callback(new Error('No backend'));
+    if (!uri.cachekey) return callback && callback(new Error('No cachekey'));
 
     this._uri = uri;
     this._expires = typeof uri.expires !== 'undefined' ? uri.expires : 300;
     this._client = uri.client || new Memcached('127.0.0.1:11211');
     this._backend = uri.backend;
-
-    // @TODO determine if backend cachekey generation is stable.
-    this._cachekey = crypto.createHash('md5')
-        .update(JSON.stringify(uri.backend))
-        .digest('hex');
+    this._cachekey = uri.cachekey;
 
     return callback && callback(null, this);
 };

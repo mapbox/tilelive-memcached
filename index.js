@@ -108,6 +108,7 @@ Source.prototype.get = function(format, z, x, y, callback) {
                     return callback(err, buffer, headers);
                 });
             }
+            else return callback(err, buffer, headers);
         });
     });
 };

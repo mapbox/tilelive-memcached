@@ -85,8 +85,8 @@ Source.prototype.get = function(format, z, x, y, callback) {
     var source = this;
     var backend = this._backend;
 
-    this._client.get(key, function(err, encoded) {
-        if (err) return callback(err);
+    this._client.get(key, function(getErr, encoded) {
+        if (getErr) console.warn(getErr);
 
         // Cache hit.
         if (encoded) try {
@@ -97,14 +97,17 @@ Source.prototype.get = function(format, z, x, y, callback) {
             return callback(err);
         }
 
-        // Cache miss.
+        // Cache miss, error, or otherwise no data
         backend[method](z, x, y, function(err, buffer, headers) {
             if (err && !/(Tile|Grid) does not exist/.test(err.message)) return callback(err);
-
-            source._client.set(key, encode(err, buffer, headers), source._expires, function(cacheErr) {
-                if (cacheErr) return callback(cacheErr);
-                return callback(err, buffer, headers);
-            });
+            // Don't try to set if get had an error on likelihood that the
+            // service is not available.
+            if (!getErr) {
+                source._client.set(key, encode(err, buffer, headers), source._expires, function(cacheErr) {
+                    if (cacheErr) return callback(cacheErr);
+                    return callback(err, buffer, headers);
+                });
+            }
         });
     });
 };

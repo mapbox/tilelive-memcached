@@ -5,7 +5,7 @@
     "main": "./index.js",
     "description": "memcached wrapping source for tilelive",
     "dependencies": {
-        "memcached": "0.2.x"
+        "memcached": "https://github.com/ianshward/node-memcached/tarball/fix-connection-issues"
     },
     "devDependencies": {
         "mocha": "1.3.x"

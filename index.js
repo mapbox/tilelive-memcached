@@ -86,7 +86,11 @@ Source.prototype.get = function(format, z, x, y, callback) {
     var backend = this._backend;
 
     this._client.get(key, function(getErr, encoded) {
-        if (getErr) console.warn(getErr);
+        if (getErr) {
+            getErr.key = key;
+            getErr.method = method;
+            source._client.emit('error', getErr);
+        }
 
         // Cache hit.
         if (encoded) try {

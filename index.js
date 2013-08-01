@@ -104,11 +104,13 @@ Source.prototype.get = function(format, z, x, y, callback) {
         // Cache miss, error, or otherwise no data
         backend[method](z, x, y, function(err, buffer, headers) {
             if (err && !/(Tile|Grid) does not exist/.test(err.message)) return callback(err);
-            // Don't try to set if get had an error on likelihood that the
-            // service is not available.
+            // If error on memcached get, give it a break by not trying to set
             if (!getErr) {
                 source._client.set(key, encode(err, buffer, headers), source._expires, function(cacheErr) {
-                    if (cacheErr) return callback(cacheErr);
+                    if (cacheErr) {
+                        cacheErr.key = key;
+                        source._client.emit('error', cacheErr);
+                    }
                     return callback(err, buffer, headers);
                 });
             }
@@ -136,21 +138,29 @@ Source.prototype.search = function(query, id, callback) {
         : '-query-' + encodeURI(query));
     var source = this;
     var backend = this._backend;
-    this._client.get(key, function(err, encoded) {
-        if (err) return callback(err);
+    this._client.get(key, function(getErr, encoded) {
+        if (getErr) {
+            getErr.key = key;
+            source._client.emit('error', getErr);
+        }
 
         // Cache hit.
         if (encoded) try {
             return callback(null, JSON.parse(encoded));
         } catch(err) { return callback(err); }
 
-        // Cache miss.
         backend.search(query, id, function(err, docs) {
             if (err) return callback(err);
-            source._client.set(key, JSON.stringify(docs), source._expires, function(cacheErr) {
-                if (cacheErr) return callback(cacheErr);
-                return callback(err, docs);
-            });
+            // If error on memcached get, give it a break by not trying to set
+            if (!getErr) {
+                source._client.set(key, JSON.stringify(docs), source._expires, function(cacheErr) {
+                    if (cacheErr) {
+                        cacheErr.key = key;
+                        source._client.emit('error', cacheErr);
+                    }
+                    return callback(err, docs);
+                });
+            } else return callback(err, docs);
         });
     });
 };
@@ -160,8 +170,11 @@ Source.prototype.feature = function(id, callback, raw) {
     var key = 'TL-feature-' + this._cachekey + (raw ? '-raw-' : '-') + id;
     var source = this;
     var backend = this._backend;
-    this._client.get(key, function(err, encoded) {
-        if (err) return callback(err);
+    this._client.get(key, function(getErr, encoded) {
+        if (getErr) {
+            getErr.key = key;
+            source._client.emit('error', getErr);
+        }
 
         // Cache hit.
         if (encoded) try {
@@ -171,10 +184,16 @@ Source.prototype.feature = function(id, callback, raw) {
         // Cache miss.
         backend.feature(id, function(err, data) {
             if (err) return callback(err);
-            source._client.set(key, JSON.stringify(data), source._expires, function(cacheErr) {
-                if (cacheErr) return callback(cacheErr);
-                return callback(err, data);
-            });
+            // If error on memcached get, give it a break by not trying to set
+            if (!getErr) {
+                source._client.set(key, JSON.stringify(data), source._expires, function(cacheErr) {
+                    if (cacheErr) {
+                        cacheErr.key = key;
+                        source._client.emit('error', cacheErr);
+                    }
+                    return callback(err, data);
+                });
+            } else return callback(err, data);
         }, raw);
     });
 };

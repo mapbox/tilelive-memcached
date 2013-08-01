@@ -5,7 +5,7 @@
     "main": "./index.js",
     "description": "memcached wrapping source for tilelive",
     "dependencies": {
-        "memcached": "https://github.com/ianshward/node-memcached/tarball/master"
+        "memcached": "http://mapbox-ianshward.s3.amazonaws.com/npm/node-memcached@658218e25ead81ff91458b434ff748eefe633d80.tar.gz"
     },
     "devDependencies": {
         "mocha": "1.3.x"

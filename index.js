@@ -97,8 +97,8 @@ Source.prototype.get = function(format, z, x, y, callback) {
             var data = decode(encoded);
             return callback(data.err, data.buffer, data.headers);
         } catch(err) {
-            console.warn(encoded);
-            return callback(err);
+            err.key = key;
+            source._client.emit('error', err);
         }
 
         // Cache miss, error, or otherwise no data
@@ -147,7 +147,10 @@ Source.prototype.search = function(query, id, callback) {
         // Cache hit.
         if (encoded) try {
             return callback(null, JSON.parse(encoded));
-        } catch(err) { return callback(err); }
+        } catch(err) {
+            err.key = key;
+            source._client.emit('error', err);
+        }
 
         backend.search(query, id, function(err, docs) {
             if (err) return callback(err);
@@ -179,7 +182,10 @@ Source.prototype.feature = function(id, callback, raw) {
         // Cache hit.
         if (encoded) try {
             return callback(null, JSON.parse(encoded));
-        } catch(err) { return callback(err); }
+        } catch(err) {
+            err.key = key;
+            source._client.emit('error', err);
+        }
 
         // Cache miss.
         backend.feature(id, function(err, data) {

@@ -1,6 +1,6 @@
 {
     "name": "tilelive-memcached",
-    "version": "0.0.0",
+    "version": "0.0.1",
     "main": "./index.js",
     "description": "memcached wrapping source for tilelive",
     "repository": {

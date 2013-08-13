@@ -1,11 +1,14 @@
 {
     "name": "tilelive-memcached",
     "version": "0.0.0",
-    "private": true,
     "main": "./index.js",
     "description": "memcached wrapping source for tilelive",
+    "repository": {
+        "type": "git",
+        "url": "git://github.com/mapbox/tilelive-memcached.git"
+    },
     "dependencies": {
-        "memcached": "http://mapbox-ianshward.s3.amazonaws.com/npm/node-memcached@fd1e2306959e1ac20c053092d6dc4136db9f49cb.tar.gz"
+        "memcached": "0.2.5"
     },
     "devDependencies": {
         "mocha": "1.3.x"

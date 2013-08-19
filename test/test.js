@@ -14,101 +14,85 @@ var grids = {
 
 function Testsource(uri, callback) {
     this._uri = uri;
+    callback(null, this);
 };
-Testsource.prototype.getTile = function(z, x, y, callback) {
-    var key = [z,x,y].join('/');
-    switch (key) {
-    case '0/0/0':
+Testsource.prototype.get = function(url, callback) {
+    switch (url) {
+    case 'http://test/0/0/0.png':
         return callback(null, tiles.a, {
             'content-type': 'image/png',
             'last-modified': now.toUTCString()
         });
-    case '1/0/0':
+    case 'http://test/1/0/0.png':
         return callback(null, tiles.b, {
             'content-type': 'image/png',
             'last-modified': now.toUTCString()
         });
-    default:
-        return callback(new Error('Tile does not exist'));
-    }
-};
-Testsource.prototype.getGrid = function(z, x, y, callback) {
-    var key = [z,x,y].join('/');
-    switch (key) {
-    case '0/0/0':
+    case 'http://test/0/0/0.grid.json':
         return callback(null, grids.a, {
             'content-type': 'application/json',
             'last-modified': now.toUTCString()
         });
-    case '1/0/0':
+    case 'http://test/1/0/0.grid.json':
         return callback(null, grids.b, {
             'content-type': 'application/json',
             'last-modified': now.toUTCString()
         });
     default:
-        return callback(new Error('Grid does not exist'));
+        var err = new Error;
+        err.status = 404;
+        return callback(err);
     }
+};
+Testsource.prototype.getTile = function(z, x, y, callback) {
+    this.get('http://test/' + [z,x,y].join('/') + '.png', function(err, buffer, headers) {
+        if (err) {
+            err.message = 'Tile does not exist';
+            return callback(err);
+        }
+        return callback(null, buffer, headers);
+    });
+};
+Testsource.prototype.getGrid = function(z, x, y, callback) {
+    this.get('http://test/' + [z,x,y].join('/') + '.grid.json', function(err, buffer, headers) {
+        if (err) {
+            err.message = 'Grid does not exist';
+            return callback(err);
+        }
+        return callback(null, buffer, headers);
+    });
 };
 
 describe('load', function() {
-    it('fails without backend', function(done) {
-        new Memsource({}, function(err) {
-            assert.equal(err.message, 'No backend');
-            done();
-        });
-    });
-    it('fails without cachekey', function(done) {
-        new Memsource({ backend: new Testsource }, function(err) {
-            assert.equal(err.message, 'No cachekey');
-            done();
-        });
-    });
-    it('loads + sets default values', function(done) {
-        var source = new Memsource({
-            backend: new Testsource,
-            cachekey: 'test'
-        });
-        assert.ok(source);
-        assert.ok(source._uri);
-        assert.ok(source._backend);
-        assert.ok(source._cachekey);
-        assert.ok(source._client);
-        assert.equal(source._expires, 300);
+    it('fails without source', function(done) {
+        assert.throws(function() { Memsource({}) });
+        assert.throws(function() { Memsource({}, {}) });
         done();
     });
-    it('loads async', function(done) {
-        new Memsource({
-            backend: new Testsource,
-            cachekey: 'test'
-        }, function(err, source) {
+    it('loads + sets default values', function(done) {
+        var Source = Memsource({}, Testsource);
+        assert.ok(Source.memcached);
+        assert.ok(Source.memcached.client);
+        assert.ok(Source.memcached.expires, 300);
+        new Source('fakeuri', function(err, source) {
             assert.ifError(err);
-            assert.ok(source);
-            assert.ok(source._client);
+            assert.ok(source instanceof Testsource);
+            assert.equal(source._uri, 'fakeuri');
             done();
         });
     });
-    it('sets expires from uri', function(done) {
-        new Memsource({
-            backend: new Testsource,
-            cachekey: 'test',
-            expires: 5
-        }, function(err, source) {
-            assert.ifError(err);
-            assert.equal(source._expires, 5);
-            done();
-        });
+    it('sets expires from opts', function(done) {
+        var Source = Memsource({ expires:5 }, Testsource);
+        assert.ok(Source.memcached);
+        assert.ok(Source.memcached.expires, 5);
+        done();
     });
-    it('sets client from uri', function(done) {
+    it('sets client from opts', function(done) {
         var client = new Memcached('127.0.0.1:11211');
-        new Memsource({
-            backend: new Testsource,
-            cachekey: 'test',
-            client: client
-        }, function(err, source) {
-            assert.ifError(err);
-            assert.strictEqual(source._client, client);
-            done();
-        });
+        var Source = Memsource({ client: client, expires:5 }, Testsource);
+        assert.ok(Source.memcached);
+        assert.strictEqual(Source.memcached.client, client);
+        done();
     });
 });
 
@@ -147,11 +131,8 @@ var error = function(message, cached, done) {
 describe('api', function() {
     var source;
     before(function(done) {
-        new Memsource({
-            backend: new Testsource,
-            cachekey: 'test',
-            expires: 1
-        }, function(err, memsource) {
+        var Source = Memsource({ expires:1 }, Testsource);
+        new Source('', function(err, memsource) {
             if (err) throw err;
             source = memsource;
             done();
@@ -198,11 +179,8 @@ describe('api', function() {
 describe('expires', function() {
     var source;
     before(function(done) {
-        new Memsource({
-            backend: new Testsource,
-            cachekey: 'test',
-            expires: 1
-        }, function(err, memsource) {
+        var Source = Memsource({ expires:1 }, Testsource);
+        new Source('', function(err, memsource) {
             if (err) throw err;
             source = memsource;
             done();

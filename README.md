@@ -1,3 +1,7 @@
 tilelive-memcached
 ------------------
-memcached wrapping source for tilelive
+node-tilejson wrapping source for tilelive.
+
+    var TileJSON = require('tilelive-memcached')({}, requre('tilejson'));
+
+    new TileJSON( ... )

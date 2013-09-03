@@ -54,6 +54,80 @@ module.exports = function(options, Source) {
         });
     };
 
+    // Carmen search method.
+    // @TODO deprecate this in future versions of carmen which should be able
+    // to use the generic get method above.
+    if (Source.prototype.search) Caching.prototype.search = function(query, id, callback) {
+        var url = (this.data && this.data._carmen) || 'NOCARMEN';
+        var key = 'TL-search-' + url + (id ? '-id-' + encodeURI(id) : '-query-' + encodeURI(query));
+        var source = this;
+        client.get(key, function(err, encoded) {
+            if (err) {
+                err.key = key;
+                client.emit('error', err);
+                return Source.prototype.search.call(source, query, id, callback);
+            }
+
+            // Cache hit.
+            if (encoded) try {
+                var data = JSON.parse(encoded);
+                return callback(null, data);
+            } catch(err) {
+                err.key = key;
+                client.emit('error', err);
+            }
+
+            // Cache miss, error, or otherwise no data
+            Source.prototype.search.call(source, query, id, function(err, data) {
+                if (err) return callback(err);
+                callback(err, data);
+                // Callback does not need to wait for memcached set to occur.
+                client.set(key, JSON.stringify(data), expires, function(err) {
+                    if (!err) return;
+                    err.key = key;
+                    client.emit('error', err);
+                });
+            });
+        });
+    };
+
+    // Carmen feature method.
+    // @TODO deprecate this in future versions of carmen which should be able
+    // to use the generic get method above.
+    if (Source.prototype.feature) Caching.prototype.feature = function(id, callback, raw) {
+        var url = (this.data && this.data._carmen) || 'NOCARMEN';
+        var key = 'TL-feature-' + url + (raw ? '-raw-' : '') + encodeURI(id);
+        var source = this;
+        client.get(key, function(err, encoded) {
+            if (err) {
+                err.key = key;
+                client.emit('error', err);
+                return Source.prototype.search.call(source, query, id, callback);
+            }
+
+            // Cache hit.
+            if (encoded) try {
+                var data = JSON.parse(encoded);
+                return callback(null, data);
+            } catch(err) {
+                err.key = key;
+                client.emit('error', err);
+            }
+
+            // Cache miss, error, or otherwise no data
+            Source.prototype.feature.call(source, id, function(err, data) {
+                if (err) return callback(err);
+                callback(err, data);
+                // Callback does not need to wait for memcached set to occur.
+                client.set(key, JSON.stringify(data), expires, function(err) {
+                    if (!err) return;
+                    err.key = key;
+                    client.emit('error', err);
+                });
+            }, raw);
+        });
+    };
+
     return Caching;
 };
 

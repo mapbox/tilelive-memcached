@@ -11,12 +11,76 @@ var grids = {
     a: { grid:'', keys: ['', '1' ], data:{'1': {'name':'foo'}} },
     b: { grid:'', keys: ['', '1' ], data:{'1': {'name':'bar'}} },
 };
+var search = {
+    'seattle': [
+        {
+            text: 'seattle-,seattle bar',
+            id: '138155',
+            zxy: [ '11/323/1287' ]
+        },
+        {
+            text: 'seattle',
+            id: '219339',
+            zxy: [
+                '11/327/1331',
+                '11/327/1332',
+                '11/327/1333',
+                '11/328/1331',
+                '11/328/1332',
+                '11/328/1333'
+            ]
+        }
+    ],
+    '219339': [
+        {
+            text: 'seattle',
+            id: '219339',
+            zxy: [
+                '11/327/1331',
+                '11/327/1332',
+                '11/327/1333',
+                '11/328/1331',
+                '11/328/1332',
+                '11/328/1333'
+            ]
+        }
+    ]
+};
+var feature = {
+    '219339.raw': {
+        _terms: [ '/mapbox-places/term/seattle.219339.11,327,1331.11,327,1332.11,327,1333.11,328,1331.11,328,1332.11,328,1333' ],
+        bounds: '-122.459696,47.4817199999999,-122.224433,47.734145',
+        lat: 47.6204993,
+        lon: -122.3508761,
+        name: 'Seattle',
+        score: 900000369465466.8,
+        search: 'Seattle',
+        type: 'city'
+    },
+    '219339': {
+        bounds: '-122.459696,47.4817199999999,-122.224433,47.734145',
+        lat: 47.6204993,
+        lon: -122.3508761,
+        name: 'Seattle',
+        score: 900000369465466.8,
+        search: 'Seattle',
+        type: 'city'
+    }
+};
 
+// Define a mock test source.
 function Testsource(uri, callback) {
     this._uri = uri;
+    this.data = { _carmen: 'http://www.example.com' };
+    this.stat = {
+        'get': 0,
+        'search': 0,
+        'feature': 0
+    };
     callback(null, this);
 };
 Testsource.prototype.get = function(url, callback) {
+    this.stat.get++;
     switch (url) {
     case 'http://test/0/0/0.png':
         return callback(null, tiles.a, {
@@ -62,6 +126,19 @@ Testsource.prototype.getGrid = function(z, x, y, callback) {
         return callback(null, buffer, headers);
     });
 };
+Testsource.prototype.search = function(query, id, callback) {
+    this.stat.search++;
+    if (query === 'seattle') return callback(null, search['seattle']);
+    if (id === '219339') return callback(null, search['219339']);
+    return callback(null, []);
+};
+Testsource.prototype.feature = function(id, callback, raw) {
+    this.stat.feature++;
+    if (id !== '219339') return callback(new Error('Not found'));
+    if (raw) return callback(null, feature['219339.raw']);
+    if (!raw) return callback(null, feature['219339']);
+    return callback(new Error('Not found'));
+};
 
 describe('load', function() {
     it('fails without source', function(done) {
@@ -96,8 +173,6 @@ describe('load', function() {
     });
 });
 
-// @TODO backend key testing.
-
 var tile = function(expected, cached, done) {
     return function(err, data, headers) {
         assert.ifError(err);
@@ -126,6 +201,36 @@ var error = function(message, cached, done) {
         assert.equal(err.message, message);
         done();
     };
+};
+
+function carmenSearch(source, args, cached, done) {
+    var statcount = source.stat.search;
+    source.search(args.query, args.id, function(err, data) {
+        assert.ifError(err);
+        assert.equal(cached ? statcount : statcount + 1, source.stat.search);
+        if (search[args.id||args.query]) {
+            assert.deepEqual(search[args.id||args.query], data);
+        } else {
+            assert.deepEqual([], data);
+        }
+        done();
+    });
+};
+
+function carmenFeature(source, id, raw, cached, done) {
+    var statcount = source.stat.feature;
+    source.feature(id, function(err, data) {
+        var key = raw ? id + '.raw' : id;
+        if (feature[key]) {
+            assert.ifError(err);
+            assert.deepEqual(feature[key], data);
+            assert.equal(cached ? statcount : statcount + 1, source.stat.feature);
+        } else {
+            assert.deepEqual(undefined, data);
+            assert.equal(statcount + 1, source.stat.feature);
+        }
+        done();
+    }, raw);
 };
 
 describe('api', function() {
@@ -173,6 +278,60 @@ describe('api', function() {
     });
     it('grid 40x hit', function(done) {
         source.getGrid(4, 0, 0, error('Grid does not exist', true, done));
+    });
+});
+
+describe('carmen', function(done) {
+    var source;
+    before(function(done) {
+        var Source = Memsource({ expires:1 }, Testsource);
+        new Source('', function(err, memsource) {
+            if (err) throw err;
+            source = memsource;
+            done();
+        });
+    });
+    it('search asdf miss', function(done) {
+        carmenSearch(source, {query:'asdf'}, false, done);
+    });
+    it('search asdf hit', function(done) {
+        carmenSearch(source, {query:'asdf'}, true, done);
+    });
+    it('search seattle miss', function(done) {
+        carmenSearch(source, {query:'seattle'}, false, done);
+    });
+    it('search seattle hit', function(done) {
+        carmenSearch(source, {query:'seattle'}, true, done);
+    });
+    it('search 219339 miss', function(done) {
+        carmenSearch(source, {id:'219339'}, false, done);
+    });
+    it('search 219339 hit', function(done) {
+        carmenSearch(source, {id:'219339'}, true, done);
+    });
+    it('feature 9999 miss', function(done) {
+        carmenFeature(source, '9999', false, false, done);
+    });
+    it('feature 9999 hit', function(done) {
+        carmenFeature(source, '9999', false, true, done);
+    });
+    it('feature 9999 raw miss', function(done) {
+        carmenFeature(source, '9999', true, false, done);
+    });
+    it('feature 9999 raw hit', function(done) {
+        carmenFeature(source, '9999', true, true, done);
+    });
+    it('feature 219339 miss', function(done) {
+        carmenFeature(source, '219339', false, false, done);
+    });
+    it('feature 219339 hit', function(done) {
+        carmenFeature(source, '219339', false, true, done);
+    });
+    it('feature 219339 raw miss', function(done) {
+        carmenFeature(source, '219339', true, false, done);
+    });
+    it('feature 219339 raw hit', function(done) {
+        carmenFeature(source, '219339', true, true, done);
     });
 });
 

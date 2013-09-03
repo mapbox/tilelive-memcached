@@ -93,12 +93,12 @@ Testsource.prototype.get = function(url, callback) {
             'last-modified': now.toUTCString()
         });
     case 'http://test/0/0/0.grid.json':
-        return callback(null, grids.a, {
+        return callback(null, JSON.stringify(grids.a), {
             'content-type': 'application/json',
             'last-modified': now.toUTCString()
         });
     case 'http://test/1/0/0.grid.json':
-        return callback(null, grids.b, {
+        return callback(null, JSON.stringify(grids.b), {
             'content-type': 'application/json',
             'last-modified': now.toUTCString()
         });
@@ -123,7 +123,7 @@ Testsource.prototype.getGrid = function(z, x, y, callback) {
             err.message = 'Grid does not exist';
             return callback(err);
         }
-        return callback(null, buffer, headers);
+        return callback(null, JSON.parse(buffer), headers);
     });
 };
 Testsource.prototype.search = function(query, id, callback) {
@@ -189,7 +189,7 @@ var grid = function(expected, cached, done) {
     return function(err, data, headers) {
         assert.ifError(err);
         assert.ok(cached ? headers['x-memcached'] : !headers['x-memcached']);
-        assert[cached ? 'deepEqual' : 'strictEqual'](data, expected);
+        assert.deepEqual(data, expected);
         assert.equal(headers['content-type'], 'application/json');
         assert.equal(headers['last-modified'], now.toUTCString());
         done();

@@ -142,9 +142,8 @@ function encode(err, buffer, headers) {
     // Unhandled error.
     if (err) throw new Error('Error could not be encoded: ' + err.message);
 
-    // Encoded data.
-    // Turn grids into buffers as well for unified caching.
-    if (buffer && !(buffer instanceof Buffer)) buffer = new Buffer(JSON.stringify(buffer));
+    // Turn strings into buffers.
+    if (buffer && !(buffer instanceof Buffer)) buffer = new Buffer(buffer);
 
     return JSON.stringify(headers || {}) + buffer.toString('base64');
 };
@@ -164,11 +163,6 @@ function decode(encoded) {
     data.headers = JSON.parse(encoded.substr(0, breaker+1));
     data.headers['x-memcached'] = 'hit';
     data.buffer = new Buffer(encoded.substr(breaker), 'base64');
-
-    // Return grids to object form.
-    var ctype = data.headers['Content-Type'] || data.headers['content-type'];
-    if (ctype && /json/.test(ctype)) data.buffer = JSON.parse(data.buffer);
-
     return data;
 };
 

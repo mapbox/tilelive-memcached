@@ -6,22 +6,25 @@ module.exports = function(options, Source) {
     if (!Source.prototype.get) throw new Error('No get method found on source');
 
     options = options || {};
-    var client = options.client || new Memcached('127.0.0.1:11211');
-    var expires = options.expires || 300;
+    options.client = ('client' in options) ? options.client : new Memcached('127.0.0.1:11211');
+    options.expires = ('expires' in options) ? options.expires : 300;
 
     function Caching() { return Source.apply(this, arguments) };
 
     // Inheritance.
     util.inherits(Caching, Source);
 
-    // References for testing, convenience.
-    Caching.memcached = {};
-    Caching.memcached.client = client;
-    Caching.memcached.expires = expires;
+    // References for testing, convenience, post-call overriding.
+    Caching.memcached = options;
 
     Caching.prototype.get = function(url, callback) {
+        if (!options.client) return callback(new Error('No memcached client'));
+        if (!options.expires) return callback(new Error('No expires option set'));
+
         var key = 'TL-' + url;
         var source = this;
+        var client = options.client;
+        var expires = options.expires;
         client.get(key, function(err, encoded) {
             // If error on memcached get, pass through to original source
             // without attempting a set after retrieval.
@@ -58,9 +61,14 @@ module.exports = function(options, Source) {
     // @TODO deprecate this in future versions of carmen which should be able
     // to use the generic get method above.
     if (Source.prototype.search) Caching.prototype.search = function(query, id, callback) {
+        if (!options.client) return callback(new Error('No memcached client'));
+        if (!options.expires) return callback(new Error('No expires option set'));
+
         var url = (this.data && this.data._carmen) || 'NOCARMEN';
         var key = 'TL-search-' + url + (id ? '-id-' + encodeURI(id) : '-query-' + encodeURI(query));
         var source = this;
+        var client = options.client;
+        var expires = options.expires;
         client.get(key, function(err, encoded) {
             if (err) {
                 err.key = key;
@@ -95,9 +103,14 @@ module.exports = function(options, Source) {
     // @TODO deprecate this in future versions of carmen which should be able
     // to use the generic get method above.
     if (Source.prototype.feature) Caching.prototype.feature = function(id, callback, raw) {
+        if (!options.client) return callback(new Error('No memcached client'));
+        if (!options.expires) return callback(new Error('No expires option set'));
+
         var url = (this.data && this.data._carmen) || 'NOCARMEN';
         var key = 'TL-feature-' + url + (raw ? '-raw-' : '') + encodeURI(id);
         var source = this;
+        var client = options.client;
+        var expires = options.expires;
         client.get(key, function(err, encoded) {
             if (err) {
                 err.key = key;

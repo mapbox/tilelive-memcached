@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/mapbox/tilelive-memcached.png?branch=master)](https://travis-ci.org/mapbox/tilelive-memcached)
+
 tilelive-memcached
 ------------------
 node-tilejson wrapping source for tilelive.

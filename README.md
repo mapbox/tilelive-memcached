@@ -8,6 +8,6 @@ node-tilejson wrapping source for tilelive.
         client: client, // optional, instantiated memcached client
         expires: 600    // optional, object expiration time in seconds
     };
-    var TileJSON = require('tilelive-memcached')(options, requre('tilejson'));
+    var TileJSON = require('tilelive-memcached')(options, require('tilejson'));
 
     new TileJSON( ... )

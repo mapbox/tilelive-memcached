@@ -115,7 +115,7 @@ module.exports = function(options, Source) {
             if (err) {
                 err.key = key;
                 client.emit('error', err);
-                return Source.prototype.search.call(source, query, id, callback);
+                return Source.prototype.feature.call(source, id, callback);
             }
 
             // Cache hit.

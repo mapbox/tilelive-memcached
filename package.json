@@ -1,20 +1,22 @@
 {
-    "name": "tilelive-memcached",
-    "version": "0.1.0",
-    "main": "./index.js",
-    "description": "memcached wrapping source for tilelive",
-    "repository": {
-        "type": "git",
-        "url": "git://github.com/mapbox/tilelive-memcached.git"
-    },
-    "dependencies": {
-        "memcached": "0.2.5"
-    },
-    "devDependencies": {
-        "mocha": "1.3.x"
-    },
-    "scripts": {
-        "test": "mocha -R spec"
-    },
-    "engines": { "node": "0.6.x || 0.8.x || 0.10.x" }
+  "name": "tilelive-memcached",
+  "version": "0.1.1",
+  "main": "./index.js",
+  "description": "memcached wrapping source for tilelive",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/mapbox/tilelive-memcached.git"
+  },
+  "dependencies": {
+    "memcached": "0.2.5"
+  },
+  "devDependencies": {
+    "mocha": "1.3.x"
+  },
+  "scripts": {
+    "test": "mocha -R spec"
+  },
+  "engines": {
+    "node": "0.6.x || 0.8.x || 0.10.x"
+  }
 }

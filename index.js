@@ -88,9 +88,10 @@ module.exports = function(options, Source) {
             // Cache miss, error, or otherwise no data
             Source.prototype.search.call(source, query, id, function(err, data) {
                 if (err) return callback(err);
+                var json = JSON.stringify(data);
                 callback(err, data);
                 // Callback does not need to wait for memcached set to occur.
-                client.set(key, JSON.stringify(data), expires, function(err) {
+                client.set(key, json, expires, function(err) {
                     if (!err) return;
                     err.key = key;
                     client.emit('error', err);
@@ -130,9 +131,10 @@ module.exports = function(options, Source) {
             // Cache miss, error, or otherwise no data
             Source.prototype.feature.call(source, id, function(err, data) {
                 if (err) return callback(err);
+                var json = JSON.stringify(data);
                 callback(err, data);
                 // Callback does not need to wait for memcached set to occur.
-                client.set(key, JSON.stringify(data), expires, function(err) {
+                client.set(key, json, expires, function(err) {
                     if (!err) return;
                     err.key = key;
                     client.emit('error', err);

@@ -128,9 +128,9 @@ Testsource.prototype.getGrid = function(z, x, y, callback) {
 };
 Testsource.prototype.search = function(query, id, callback) {
     this.stat.search++;
-    if (query === 'seattle') return callback(null, search['seattle']);
-    if (id === '219339') return callback(null, search['219339']);
-    return callback(null, []);
+    if (query === 'seattle') return callback(null, search['seattle'].slice(0));
+    if (id === '219339') return callback(null, search['219339'].slice(0));
+    return callback(null, [].slice(0));
 };
 Testsource.prototype.feature = function(id, callback, raw) {
     this.stat.feature++;
@@ -213,6 +213,7 @@ function carmenSearch(source, args, cached, done) {
         } else {
             assert.deepEqual([], data);
         }
+        data.shift();
         done();
     });
 };

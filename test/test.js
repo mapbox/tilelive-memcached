@@ -85,11 +85,13 @@ Testsource.prototype.get = function(url, callback) {
     case 'http://test/0/0/0.png':
         return callback(null, tiles.a, {
             'content-type': 'image/png',
+            'content-length': 11541,
             'last-modified': now.toUTCString()
         });
     case 'http://test/1/0/0.png':
         return callback(null, tiles.b, {
             'content-type': 'image/png',
+            'content-length': 6199,
             'last-modified': now.toUTCString()
         });
     case 'http://test/0/0/0.grid.json':

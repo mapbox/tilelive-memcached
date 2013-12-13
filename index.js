@@ -178,6 +178,8 @@ function decode(encoded) {
     data.headers = JSON.parse(encoded.substr(0, breaker+1));
     data.headers['x-memcached'] = 'hit';
     data.buffer = new Buffer(encoded.substr(breaker), 'base64');
+    if (data.headers['content-length'] && data.headers['content-length'] != data.buffer.length)
+        throw new Error('Content length does not match');
     return data;
 };
 

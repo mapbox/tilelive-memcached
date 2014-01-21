@@ -71,6 +71,7 @@ var feature = {
 // Define a mock test source.
 function Testsource(uri, callback) {
     this._uri = uri;
+    this.hostname = uri.hostname || 'test';
     this.data = { _carmen: 'http://www.example.com' };
     this.stat = {
         'get': 0,
@@ -104,6 +105,28 @@ Testsource.prototype.get = function(url, callback) {
             'content-type': 'application/json',
             'last-modified': now.toUTCString()
         });
+    case 'http://long/0/0/0.png':
+        return callback(null, tiles.a, {
+            'content-type': 'image/png',
+            'content-length': 11541,
+            'last-modified': now.toUTCString()
+        });
+    case 'http://long/1/0/0.png':
+        return callback(null, tiles.b, {
+            'content-type': 'image/png',
+            'content-length': 6199,
+            'last-modified': now.toUTCString()
+        });
+    case 'http://long/0/0/0.grid.json':
+        return callback(null, JSON.stringify(grids.a), {
+            'content-type': 'application/json',
+            'last-modified': now.toUTCString()
+        });
+    case 'http://long/1/0/0.grid.json':
+        return callback(null, JSON.stringify(grids.b), {
+            'content-type': 'application/json',
+            'last-modified': now.toUTCString()
+        });
     default:
         var err = new Error;
         err.status = 404;
@@ -111,7 +134,7 @@ Testsource.prototype.get = function(url, callback) {
     }
 };
 Testsource.prototype.getTile = function(z, x, y, callback) {
-    this.get('http://test/' + [z,x,y].join('/') + '.png', function(err, buffer, headers) {
+    this.get('http://' + this.hostname + '/' + [z,x,y].join('/') + '.png', function(err, buffer, headers) {
         if (err) {
             err.message = 'Tile does not exist';
             return callback(err);
@@ -120,7 +143,7 @@ Testsource.prototype.getTile = function(z, x, y, callback) {
     });
 };
 Testsource.prototype.getGrid = function(z, x, y, callback) {
-    this.get('http://test/' + [z,x,y].join('/') + '.grid.json', function(err, buffer, headers) {
+    this.get('http://' + this.hostname + '/' + [z,x,y].join('/') + '.grid.json', function(err, buffer, headers) {
         if (err) {
             err.message = 'Grid does not exist';
             return callback(err);
@@ -207,13 +230,27 @@ var error = function(message, cached, done) {
 
 describe('api', function() {
     var source;
+    var longsource;
+    var Source = Memsource({ expires:{
+        long: 60000,
+        test: 1
+    } }, Testsource);
     before(function(done) {
-        var Source = Memsource({ expires:1 }, Testsource);
         new Source('', function(err, memsource) {
             if (err) throw err;
             source = memsource;
             done();
         });
+    });
+    before(function(done) {
+        new Source({hostname:'long'}, function(err, memsource) {
+            if (err) throw err;
+            longsource = memsource;
+            done();
+        });
+    });
+    before(function(done) {
+        Source.memcached.client.flush(done);
     });
     it('tile 200 a miss', function(done) {
         source.getTile(0, 0, 0, tile(tiles.a, false, done));
@@ -251,15 +288,38 @@ describe('api', function() {
     it('grid 40x hit', function(done) {
         source.getGrid(4, 0, 0, error('Grid does not exist', true, done));
     });
+    it('long tile 200 a hit', function(done) {
+        longsource.getTile(0, 0, 0, tile(tiles.a, false, done));
+    });
+    it('long tile 200 b hit', function(done) {
+        longsource.getTile(1, 0, 0, tile(tiles.b, false, done));
+    });
+    it('long grid 200 a hit', function(done) {
+        longsource.getGrid(0, 0, 0, grid(grids.a, false, done));
+    });
+    it('long grid 200 b hit', function(done) {
+        longsource.getGrid(1, 0, 0, grid(grids.b, false, done));
+    });
 });
 
 describe('expires', function() {
     var source;
+    var longsource;
+    var Source = Memsource({ expires:{
+        long: 60000,
+        test: 1
+    } }, Testsource);
     before(function(done) {
-        var Source = Memsource({ expires:1 }, Testsource);
         new Source('', function(err, memsource) {
             if (err) throw err;
             source = memsource;
+            done();
+        });
+    });
+    before(function(done) {
+        new Source({hostname:'long'}, function(err, memsource) {
+            if (err) throw err;
+            longsource = memsource;
             done();
         });
     });
@@ -283,5 +343,17 @@ describe('expires', function() {
     });
     it('grid 40x expires', function(done) {
         source.getGrid(4, 0, 0, error('Grid does not exist', false, done));
+    });
+    it('long tile 200 a hit', function(done) {
+        longsource.getTile(0, 0, 0, tile(tiles.a, true, done));
+    });
+    it('long tile 200 b hit', function(done) {
+        longsource.getTile(1, 0, 0, tile(tiles.b, true, done));
+    });
+    it('long grid 200 a hit', function(done) {
+        longsource.getGrid(0, 0, 0, grid(grids.a, true, done));
+    });
+    it('long grid 200 b hit', function(done) {
+        longsource.getGrid(1, 0, 0, grid(grids.b, true, done));
     });
 });

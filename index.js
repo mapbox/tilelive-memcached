@@ -1,3 +1,4 @@
+var urlParse = require('url').parse;
 var util = require('util');
 var Memcached = require('memcached');
 
@@ -24,7 +25,12 @@ module.exports = function(options, Source) {
         var key = 'TL-' + url;
         var source = this;
         var client = options.client;
-        var expires = options.expires;
+        var expires;
+        if (typeof options.expires === 'number') {
+            expires = options.expires;
+        } else {
+            expires = options.expires[urlParse(url).hostname] || 300;
+        }
         client.get(key, function(err, encoded) {
             // If error on memcached get, pass through to original source
             // without attempting a set after retrieval.

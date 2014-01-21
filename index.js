@@ -29,7 +29,7 @@ module.exports = function(options, Source) {
         if (typeof options.expires === 'number') {
             expires = options.expires;
         } else {
-            expires = options.expires[urlParse(url).hostname] || 300;
+            expires = options.expires[urlParse(url).hostname] || options.expires.default || 300;
         }
         client.get(key, function(err, encoded) {
             // If error on memcached get, pass through to original source

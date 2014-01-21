@@ -205,37 +205,6 @@ var error = function(message, cached, done) {
     };
 };
 
-function carmenSearch(source, args, cached, done) {
-    var statcount = source.stat.search;
-    source.search(args.query, args.id, function(err, data) {
-        assert.ifError(err);
-        assert.equal(cached ? statcount : statcount + 1, source.stat.search);
-        if (search[args.id||args.query]) {
-            assert.deepEqual(search[args.id||args.query], data);
-        } else {
-            assert.deepEqual([], data);
-        }
-        data.shift();
-        done();
-    });
-};
-
-function carmenFeature(source, id, raw, cached, done) {
-    var statcount = source.stat.feature;
-    source.feature(id, function(err, data) {
-        var key = raw ? id + '.raw' : id;
-        if (feature[key]) {
-            assert.ifError(err);
-            assert.deepEqual(feature[key], data);
-            assert.equal(cached ? statcount : statcount + 1, source.stat.feature);
-        } else {
-            assert.deepEqual(undefined, data);
-            assert.equal(statcount + 1, source.stat.feature);
-        }
-        done();
-    }, raw);
-};
-
 describe('api', function() {
     var source;
     before(function(done) {
@@ -281,60 +250,6 @@ describe('api', function() {
     });
     it('grid 40x hit', function(done) {
         source.getGrid(4, 0, 0, error('Grid does not exist', true, done));
-    });
-});
-
-describe('carmen', function(done) {
-    var source;
-    before(function(done) {
-        var Source = Memsource({ expires:1 }, Testsource);
-        new Source('', function(err, memsource) {
-            if (err) throw err;
-            source = memsource;
-            done();
-        });
-    });
-    it('search asdf miss', function(done) {
-        carmenSearch(source, {query:'asdf'}, false, done);
-    });
-    it('search asdf hit', function(done) {
-        carmenSearch(source, {query:'asdf'}, true, done);
-    });
-    it('search seattle miss', function(done) {
-        carmenSearch(source, {query:'seattle'}, false, done);
-    });
-    it('search seattle hit', function(done) {
-        carmenSearch(source, {query:'seattle'}, true, done);
-    });
-    it('search 219339 miss', function(done) {
-        carmenSearch(source, {id:'219339'}, false, done);
-    });
-    it('search 219339 hit', function(done) {
-        carmenSearch(source, {id:'219339'}, true, done);
-    });
-    it('feature 9999 miss', function(done) {
-        carmenFeature(source, '9999', false, false, done);
-    });
-    it('feature 9999 hit', function(done) {
-        carmenFeature(source, '9999', false, true, done);
-    });
-    it('feature 9999 raw miss', function(done) {
-        carmenFeature(source, '9999', true, false, done);
-    });
-    it('feature 9999 raw hit', function(done) {
-        carmenFeature(source, '9999', true, true, done);
-    });
-    it('feature 219339 miss', function(done) {
-        carmenFeature(source, '219339', false, false, done);
-    });
-    it('feature 219339 hit', function(done) {
-        carmenFeature(source, '219339', false, true, done);
-    });
-    it('feature 219339 raw miss', function(done) {
-        carmenFeature(source, '219339', true, false, done);
-    });
-    it('feature 219339 raw hit', function(done) {
-        carmenFeature(source, '219339', true, true, done);
     });
 });
 

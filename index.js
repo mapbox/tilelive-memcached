@@ -9,6 +9,10 @@ module.exports = function(options, Source) {
     options = options || {};
     options.client = ('client' in options) ? options.client : new Memcached('127.0.0.1:11211');
     options.expires = ('expires' in options) ? options.expires : 300;
+    options.mode = ('mode' in options) ? options.mode : 'readthrough';
+
+    if (!options.client) throw new Error('No memcached client');
+    if (!options.expires) throw new Error('No expires option set');
 
     function Caching() { return Source.apply(this, arguments) };
 
@@ -18,10 +22,71 @@ module.exports = function(options, Source) {
     // References for testing, convenience, post-call overriding.
     Caching.memcached = options;
 
-    Caching.prototype.get = function(url, callback) {
-        if (!options.client) return callback(new Error('No memcached client'));
-        if (!options.expires) return callback(new Error('No expires option set'));
+    if (options.mode === 'readthrough') {
+        Caching.prototype.get = readthrough;
+    } else if (options.mode === 'race') {
+        Caching.prototype.get = race;
+    } else {
+        throw new Error('Invalid value for options.mode ' + options.mode);
+    }
 
+    function race(url, callback) {
+        var key = 'TL-' + url;
+        var source = this;
+        var client = options.client;
+        var expires;
+        if (typeof options.expires === 'number') {
+            expires = options.expires;
+        } else {
+            expires = options.expires[urlParse(url).hostname] || options.expires.default || 300;
+        }
+
+        var sent = false;
+        var cached = null;
+        var current = null;
+
+        // GET upstream.
+        Source.prototype.get.call(source, url, function(err, buffer, headers) {
+            current = encode(err, buffer, headers);
+            if (cached && current) finalize();
+            if (sent) return;
+            sent = true;
+            callback(err, buffer, headers);
+        });
+
+        // GET memcached.
+        client.get(key, function(err, encoded) {
+            // If error on memcached, do not flip first flag.
+            // Finalize will never occur (no cache set).
+            if (err) return (err.key = key) && client.emit('error', err);
+
+            cached = encoded || '500';
+            if (cached && current) finalize();
+            if (sent || !encoded) return;
+            var data;
+            try {
+                data = decode(cached);
+            } catch(err) {
+                (err.key = key) && client.emit('error', err);
+                cached = '500';
+            }
+            if (data) {
+                sent = true;
+                callback(data.err, data.buffer, data.headers);
+            }
+        });
+
+        function finalize() {
+            if (cached === current) return;
+            client.set(key, current, expires, function(err) {
+                if (!err) return;
+                err.key = key;
+                client.emit('error', err);
+            });
+        }
+    };
+
+    function readthrough(url, callback) {
         var key = 'TL-' + url;
         var source = this;
         var client = options.client;
@@ -76,7 +141,7 @@ function encode(err, buffer, headers) {
     if (err && err.status === 403) return '403';
 
     // Unhandled error.
-    if (err) throw new Error('Error could not be encoded: ' + err.message);
+    if (err) return null;
 
     // Turn strings into buffers.
     if (buffer && !(buffer instanceof Buffer)) buffer = new Buffer(buffer);

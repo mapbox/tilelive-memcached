@@ -137,8 +137,8 @@ module.exports.encode = encode;
 module.exports.decode = decode;
 
 function encode(err, buffer, headers) {
-    if (err && err.status === 404) return '404'
-    if (err && err.status === 403) return '403'
+    if (err && err.status === 404) return '404';
+    if (err && err.status === 403) return '403';
 
     // Unhandled error.
     if (err) return null;
@@ -150,7 +150,7 @@ function encode(err, buffer, headers) {
 };
 
 function decode(encoded) {
-    if (encoded === '403' || encoded === '404') {
+    if (encoded === '404' || encoded === '403') {
         var err = new Error();
         err.status = parseInt(encoded, 10);
         err.memcached = true;

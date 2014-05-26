@@ -5,7 +5,7 @@ tilelive-memcached
 node-tilejson wrapping source for tilelive.
 
     var options = {
-        mode: 'readthrough', // optional, cachde mode either 'readthrough' or 'race'
+        mode: 'readthrough', // optional, cache mode either 'readthrough' or 'race'
         client: client, // optional, instantiated memcached client
         expires: 600    // optional, object expiration time in seconds
     };

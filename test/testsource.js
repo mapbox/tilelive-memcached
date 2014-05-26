@@ -20,7 +20,6 @@ function Testsource(uri, callback) {
     this._uri = uri;
     this.delay = uri.delay || 0;
     this.hostname = uri.hostname || 'test';
-    this.data = { _carmen: 'http://www.example.com' };
     this.stat = {
         'get': 0
     };
@@ -50,6 +49,8 @@ Testsource.prototype.get = function(url, callback) {
                 'content-length': 6199,
                 'last-modified': now.toUTCString()
             });
+        case 'http://test/2/0/0.png':
+            return callback(new Error('Unexpected error'));
         case 'http://test/0/0/0.grid.json':
             return callback(null, JSON.stringify(grids.a), {
                 'content-type': 'application/json',
@@ -92,7 +93,7 @@ Testsource.prototype.get = function(url, callback) {
 Testsource.prototype.getTile = function(z, x, y, callback) {
     this.get('http://' + this.hostname + '/' + [z,x,y].join('/') + '.png', function(err, buffer, headers) {
         if (err) {
-            err.message = 'Tile does not exist';
+            err.message = err.message || 'Tile does not exist';
             return callback(err);
         }
         return callback(null, buffer, headers);
@@ -101,7 +102,7 @@ Testsource.prototype.getTile = function(z, x, y, callback) {
 Testsource.prototype.getGrid = function(z, x, y, callback) {
     this.get('http://' + this.hostname + '/' + [z,x,y].join('/') + '.grid.json', function(err, buffer, headers) {
         if (err) {
-            err.message = 'Grid does not exist';
+            err.message = err.message || 'Grid does not exist';
             return callback(err);
         }
         return callback(null, JSON.parse(buffer), headers);

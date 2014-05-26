@@ -61,7 +61,7 @@ module.exports = function(options, Source) {
             if (err) return (err.key = key) && client.emit('error', err);
 
             cached = encoded || '500';
-            if (cached) finalize();
+            if (cached && current) finalize();
             if (sent || !encoded) return;
             var data;
             try {
@@ -137,10 +137,11 @@ module.exports.encode = encode;
 module.exports.decode = decode;
 
 function encode(err, buffer, headers) {
-    if (err && err.status >= 400 && err.status < 500) return err.status.toString();
+    if (err && err.status === 404) return '404'
+    if (err && err.status === 403) return '403'
 
     // Unhandled error.
-    if (err) throw new Error('Error could not be encoded: ' + err.message);
+    if (err) return null;
 
     // Turn strings into buffers.
     if (buffer && !(buffer instanceof Buffer)) buffer = new Buffer(buffer);
@@ -149,7 +150,7 @@ function encode(err, buffer, headers) {
 };
 
 function decode(encoded) {
-    if (encoded.length === 3 && encoded[0] === '4') {
+    if (encoded === '403' || encoded === '404') {
         var err = new Error();
         err.status = parseInt(encoded, 10);
         err.memcached = true;

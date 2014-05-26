@@ -133,6 +133,12 @@ describe('readthrough', function() {
     it('tile 40x hit', function(done) {
         source.getTile(4, 0, 0, error('Tile does not exist', true, done));
     });
+    it('tile 500 miss', function(done) {
+        source.getTile(2, 0, 0, error('Unexpected error', false, done));
+    });
+    it('tile 500 miss', function(done) {
+        source.getTile(2, 0, 0, error('Unexpected error', false, done));
+    });
     it('grid 200 a miss', function(done) {
         source.getGrid(0, 0, 0, grid(grids.a, false, done));
     });
@@ -285,6 +291,12 @@ describe('race', function() {
     });
     it('tile 40x hit', function(done) {
         source.getTile(4, 0, 0, error('Tile does not exist', true, done));
+    });
+    it('tile 500 miss', function(done) {
+        source.getTile(2, 0, 0, error('Unexpected error', false, done));
+    });
+    it('tile 500 miss', function(done) {
+        source.getTile(2, 0, 0, error('Unexpected error', false, done));
     });
     it('grid 200 a miss', function(done) {
         source.getGrid(0, 0, 0, grid(grids.a, false, done));

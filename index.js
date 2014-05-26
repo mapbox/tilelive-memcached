@@ -142,8 +142,7 @@ module.exports.encode = encode;
 module.exports.decode = decode;
 
 function encode(err, buffer, headers) {
-    if (err && err.status === 404) return '404';
-    if (err && err.status === 403) return '403';
+    if (err && err.status >= 400 && err.status < 500) return err.status.toString();
 
     // Unhandled error.
     if (err) throw new Error('Error could not be encoded: ' + err.message);
@@ -155,7 +154,7 @@ function encode(err, buffer, headers) {
 };
 
 function decode(encoded) {
-    if (encoded === '404' || encoded === '403') {
+    if (encoded.length === 3 && encoded[0] === '4') {
         var err = new Error();
         err.status = parseInt(encoded, 10);
         err.memcached = true;

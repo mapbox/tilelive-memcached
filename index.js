@@ -41,13 +41,14 @@ module.exports = function(options, Source) {
             }
 
             // Cache hit.
+            var data;
             if (encoded) try {
-                var data = decode(encoded);
-                return callback(data.err, data.buffer, data.headers);
+                data = decode(encoded);
             } catch(err) {
                 err.key = key;
                 client.emit('error', err);
             }
+            if (data) return callback(data.err, data.buffer, data.headers);
 
             // Cache miss, error, or otherwise no data
             Source.prototype.get.call(source, url, function(err, buffer, headers) {

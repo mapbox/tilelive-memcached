@@ -50,13 +50,8 @@ module.exports = function(options, Source) {
             current = encode(err, buffer, headers);
             if (cached && current) finalize();
             if (sent) return;
-            if (err && err.status !== 404 && err.status !== 403) {
-                sent = true;
-                callback(err);
-            } else {
-                sent = true;
-                callback(err, buffer, headers);
-            }
+            sent = true;
+            callback(err, buffer, headers);
         });
 
         // GET memcached.

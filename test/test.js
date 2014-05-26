@@ -31,6 +31,14 @@ describe('load', function() {
         assert.ok(Source.memcached.expires, 5);
         done();
     });
+    it('sets mode from opts', function(done) {
+        assert.throws(function() {
+            var Source = Memsource({ mode:'awesome' }, Testsource);
+        }, /Invalid value for options\.mode/);
+        var Source = Memsource({ mode:'race' }, Testsource);
+        assert.ok(Source.memcached.mode, 'readthrough');
+        done();
+    });
     it('sets client from opts', function(done) {
         var client = new Memcached('127.0.0.1:11211');
         var Source = Memsource({ client: client, expires:5 }, Testsource);
@@ -70,13 +78,16 @@ var error = function(message, cached, done) {
     };
 };
 
-describe('api', function() {
+describe('readthrough', function() {
     var source;
     var longsource;
-    var Source = Memsource({ expires:{
+    var Source = Memsource({ expires: {
         long: 60000,
         test: 1
     } }, Testsource);
+    before(function(done) {
+        Source.memcached.client.flush(done);
+    });
     before(function(done) {
         new Source('', function(err, memsource) {
             if (err) throw err;
@@ -90,9 +101,6 @@ describe('api', function() {
             longsource = memsource;
             done();
         });
-    });
-    before(function(done) {
-        Source.memcached.client.flush(done);
     });
     it('tile 200 a miss', function(done) {
         source.getTile(0, 0, 0, tile(tiles.a, false, done));
@@ -130,72 +138,181 @@ describe('api', function() {
     it('grid 40x hit', function(done) {
         source.getGrid(4, 0, 0, error('Grid does not exist', true, done));
     });
-    it('long tile 200 a hit', function(done) {
+    it('long tile 200 a miss', function(done) {
         longsource.getTile(0, 0, 0, tile(tiles.a, false, done));
     });
-    it('long tile 200 b hit', function(done) {
+    it('long tile 200 b miss', function(done) {
         longsource.getTile(1, 0, 0, tile(tiles.b, false, done));
     });
-    it('long grid 200 a hit', function(done) {
+    it('long grid 200 a miss', function(done) {
         longsource.getGrid(0, 0, 0, grid(grids.a, false, done));
     });
-    it('long grid 200 b hit', function(done) {
+    it('long grid 200 b miss', function(done) {
         longsource.getGrid(1, 0, 0, grid(grids.b, false, done));
+    });
+    describe('expires', function() {
+        before(function(done) {
+            setTimeout(done, 1000);
+        });
+        it('tile 200 a expires', function(done) {
+            source.getTile(0, 0, 0, tile(tiles.a, false, done));
+        });
+        it('tile 200 b expires', function(done) {
+            source.getTile(1, 0, 0, tile(tiles.b, false, done));
+        });
+        it('tile 40x expires', function(done) {
+            source.getTile(4, 0, 0, error('Tile does not exist', false, done));
+        });
+        it('grid 200 a expires', function(done) {
+            source.getGrid(0, 0, 0, grid(grids.a, false, done));
+        });
+        it('grid 200 b expires', function(done) {
+            source.getGrid(1, 0, 0, grid(grids.b, false, done));
+        });
+        it('grid 40x expires', function(done) {
+            source.getGrid(4, 0, 0, error('Grid does not exist', false, done));
+        });
+        it('long tile 200 a hit', function(done) {
+            longsource.getTile(0, 0, 0, tile(tiles.a, true, done));
+        });
+        it('long tile 200 b hit', function(done) {
+            longsource.getTile(1, 0, 0, tile(tiles.b, true, done));
+        });
+        it('long grid 200 a hit', function(done) {
+            longsource.getGrid(0, 0, 0, grid(grids.a, true, done));
+        });
+        it('long grid 200 b hit', function(done) {
+            longsource.getGrid(1, 0, 0, grid(grids.b, true, done));
+        });
     });
 });
 
-describe('expires', function() {
+describe('race', function() {
     var source;
     var longsource;
-    var Source = Memsource({ expires:{
+    var fastsource;
+    var Source = Memsource({ expires: {
         long: 60000,
         test: 1
-    } }, Testsource);
+    }, mode:'race' }, Testsource);
     before(function(done) {
-        new Source('', function(err, memsource) {
+        Source.memcached.client.flush(done);
+    });
+    before(function(done) {
+        new Source({ delay:50 }, function(err, memsource) {
             if (err) throw err;
             source = memsource;
             done();
         });
     });
     before(function(done) {
-        new Source({hostname:'long'}, function(err, memsource) {
+        new Source({ hostname:'long', delay:50 }, function(err, memsource) {
             if (err) throw err;
             longsource = memsource;
             done();
         });
     });
     before(function(done) {
-        setTimeout(done, 1000);
+        new Source({ delay:0 }, function(err, memsource) {
+            if (err) throw err;
+            fastsource = memsource;
+            done();
+        });
     });
-    it('tile 200 a expires', function(done) {
+    it('tile 200 a miss', function(done) {
         source.getTile(0, 0, 0, tile(tiles.a, false, done));
     });
-    it('tile 200 b expires', function(done) {
+    it('tile 200 a hit', function(done) {
+        source.getTile(0, 0, 0, tile(tiles.a, true, done));
+    });
+    it('tile 200 b miss', function(done) {
         source.getTile(1, 0, 0, tile(tiles.b, false, done));
     });
-    it('tile 40x expires', function(done) {
+    it('tile 200 b hit', function(done) {
+        source.getTile(1, 0, 0, tile(tiles.b, true, done));
+    });
+    it('tile 40x miss', function(done) {
         source.getTile(4, 0, 0, error('Tile does not exist', false, done));
     });
-    it('grid 200 a expires', function(done) {
+    it('tile 40x hit', function(done) {
+        source.getTile(4, 0, 0, error('Tile does not exist', true, done));
+    });
+    it('grid 200 a miss', function(done) {
         source.getGrid(0, 0, 0, grid(grids.a, false, done));
     });
-    it('grid 200 b expires', function(done) {
+    it('grid 200 a hit', function(done) {
+        source.getGrid(0, 0, 0, grid(grids.a, true, done));
+    });
+    it('grid 200 b miss', function(done) {
         source.getGrid(1, 0, 0, grid(grids.b, false, done));
     });
-    it('grid 40x expires', function(done) {
+    it('grid 200 b hit', function(done) {
+        source.getGrid(1, 0, 0, grid(grids.b, true, done));
+    });
+    it('grid 40x miss', function(done) {
         source.getGrid(4, 0, 0, error('Grid does not exist', false, done));
     });
-    it('long tile 200 a hit', function(done) {
-        longsource.getTile(0, 0, 0, tile(tiles.a, true, done));
+    it('grid 40x hit', function(done) {
+        source.getGrid(4, 0, 0, error('Grid does not exist', true, done));
     });
-    it('long tile 200 b hit', function(done) {
-        longsource.getTile(1, 0, 0, tile(tiles.b, true, done));
+    it('fast tile 200 a miss', function(done) {
+        fastsource.getTile(0, 0, 0, tile(tiles.a, false, done));
     });
-    it('long grid 200 a hit', function(done) {
-        longsource.getGrid(0, 0, 0, grid(grids.a, true, done));
+    it('fast tile 200 a miss', function(done) {
+        fastsource.getTile(0, 0, 0, tile(tiles.a, false, done));
     });
-    it('long grid 200 b hit', function(done) {
-        longsource.getGrid(1, 0, 0, grid(grids.b, true, done));
+    it('fast grid 200 a miss', function(done) {
+        fastsource.getGrid(0, 0, 0, grid(grids.a, false, done));
+    });
+    it('fast grid 200 a miss', function(done) {
+        fastsource.getGrid(0, 0, 0, grid(grids.a, false, done));
+    });
+    it('long tile 200 a miss', function(done) {
+        longsource.getTile(0, 0, 0, tile(tiles.a, false, done));
+    });
+    it('long tile 200 b miss', function(done) {
+        longsource.getTile(1, 0, 0, tile(tiles.b, false, done));
+    });
+    it('long grid 200 a miss', function(done) {
+        longsource.getGrid(0, 0, 0, grid(grids.a, false, done));
+    });
+    it('long grid 200 b miss', function(done) {
+        longsource.getGrid(1, 0, 0, grid(grids.b, false, done));
+    });
+    describe('expires', function() {
+        before(function(done) {
+            setTimeout(done, 1000);
+        });
+        it('tile 200 a expires', function(done) {
+            source.getTile(0, 0, 0, tile(tiles.a, false, done));
+        });
+        it('tile 200 b expires', function(done) {
+            source.getTile(1, 0, 0, tile(tiles.b, false, done));
+        });
+        it('tile 40x expires', function(done) {
+            source.getTile(4, 0, 0, error('Tile does not exist', false, done));
+        });
+        it('grid 200 a expires', function(done) {
+            source.getGrid(0, 0, 0, grid(grids.a, false, done));
+        });
+        it('grid 200 b expires', function(done) {
+            source.getGrid(1, 0, 0, grid(grids.b, false, done));
+        });
+        it('grid 40x expires', function(done) {
+            source.getGrid(4, 0, 0, error('Grid does not exist', false, done));
+        });
+        it('long tile 200 a hit', function(done) {
+            longsource.getTile(0, 0, 0, tile(tiles.a, true, done));
+        });
+        it('long tile 200 b hit', function(done) {
+            longsource.getTile(1, 0, 0, tile(tiles.b, true, done));
+        });
+        it('long grid 200 a hit', function(done) {
+            longsource.getGrid(0, 0, 0, grid(grids.a, true, done));
+        });
+        it('long grid 200 b hit', function(done) {
+            longsource.getGrid(1, 0, 0, grid(grids.b, true, done));
+        });
     });
 });
+

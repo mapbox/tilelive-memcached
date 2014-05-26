@@ -11,6 +11,9 @@ module.exports = function(options, Source) {
     options.expires = ('expires' in options) ? options.expires : 300;
     options.mode = ('mode' in options) ? options.mode : 'readthrough';
 
+    if (!options.client) throw new Error('No memcached client');
+    if (!options.expires) throw new Error('No expires option set');
+
     function Caching() { return Source.apply(this, arguments) };
 
     // Inheritance.
@@ -23,12 +26,11 @@ module.exports = function(options, Source) {
         Caching.prototype.get = readthrough;
     } else if (options.mode === 'race') {
         Caching.prototype.get = race;
+    } else {
+        throw new Error('Invalid value for options.mode ' + options.mode);
     }
 
     function race(url, callback) {
-        if (!options.client) return callback(new Error('No memcached client'));
-        if (!options.expires) return callback(new Error('No expires option set'));
-
         var key = 'TL-' + url;
         var source = this;
         var client = options.client;
@@ -39,23 +41,22 @@ module.exports = function(options, Source) {
             expires = options.expires[urlParse(url).hostname] || options.expires.default || 300;
         }
 
-        // The first op to finish will flip this flag.
-        var first = true;
-
+        var sent = false;
         var cached = null;
         var current = null;
 
         // GET upstream.
         Source.prototype.get.call(source, url, function(err, buffer, headers) {
             current = encode(err, buffer, headers);
-            if (!first) {
-                finalize();
-            } else if (err && err.status !== 404 && err.status !== 403) {
+            if (cached && current) finalize();
+            if (sent) return;
+            if (err && err.status !== 404 && err.status !== 403) {
+                sent = true;
                 callback(err);
             } else {
+                sent = true;
                 callback(err, buffer, headers);
             }
-            first = false;
         });
 
         // GET memcached.
@@ -64,32 +65,33 @@ module.exports = function(options, Source) {
             // Finalize will never occur (no cache set).
             if (err) return (err.key = key) && client.emit('error', err);
 
-            cached = encoded;
-            if (!first) {
-                finalize();
-            } else if (encoded) {
-                var data
-                try { decode(encoded); }
-                catch(err) { (err.key = key) && client.emit('error', err); }
-                if (data) callback(data.err, data.buffer, data.headers);
+            cached = encoded || '500';
+            if (cached) finalize();
+            if (sent || !encoded) return;
+            var data;
+            try {
+                data = decode(cached);
+            } catch(err) {
+                (err.key = key) && client.emit('error', err);
+                cached = '500';
             }
-            first = false;
+            if (data) {
+                sent = true;
+                callback(data.err, data.buffer, data.headers);
+            }
         });
-    };
 
-    function finalize() {
-        if (cached === current) return;
-        client.set(key, current, expires, function(err) {
-            if (!err) return;
-            err.key = key;
-            client.emit('error', err);
-        });
+        function finalize() {
+            if (cached === current) return;
+            client.set(key, current, expires, function(err) {
+                if (!err) return;
+                err.key = key;
+                client.emit('error', err);
+            });
+        }
     };
 
     function readthrough(url, callback) {
-        if (!options.client) return callback(new Error('No memcached client'));
-        if (!options.expires) return callback(new Error('No expires option set'));
-
         var key = 'TL-' + url;
         var source = this;
         var client = options.client;

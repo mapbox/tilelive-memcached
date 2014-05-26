@@ -9,6 +9,7 @@ module.exports = function(options, Source) {
     options = options || {};
     options.client = ('client' in options) ? options.client : new Memcached('127.0.0.1:11211');
     options.expires = ('expires' in options) ? options.expires : 300;
+    options.mode = ('mode' in options) ? options.mode : 'readthrough';
 
     function Caching() { return Source.apply(this, arguments) };
 
@@ -18,7 +19,74 @@ module.exports = function(options, Source) {
     // References for testing, convenience, post-call overriding.
     Caching.memcached = options;
 
-    Caching.prototype.get = function(url, callback) {
+    if (options.mode === 'readthrough') {
+        Caching.prototype.get = readthrough;
+    } else if (options.mode === 'race') {
+        Caching.prototype.get = race;
+    }
+
+    function race(url, callback) {
+        if (!options.client) return callback(new Error('No memcached client'));
+        if (!options.expires) return callback(new Error('No expires option set'));
+
+        var key = 'TL-' + url;
+        var source = this;
+        var client = options.client;
+        var expires;
+        if (typeof options.expires === 'number') {
+            expires = options.expires;
+        } else {
+            expires = options.expires[urlParse(url).hostname] || options.expires.default || 300;
+        }
+
+        // The first op to finish will flip this flag.
+        var first = true;
+
+        var cached = null;
+        var current = null;
+
+        // GET upstream.
+        Source.prototype.get.call(source, url, function(err, buffer, headers) {
+            current = encode(err, buffer, headers);
+            if (!first) {
+                finalize();
+            } else if (err && err.status !== 404 && err.status !== 403) {
+                callback(err);
+            } else {
+                callback(err, buffer, headers);
+            }
+            first = false;
+        });
+
+        // GET memcached.
+        client.get(key, function(err, encoded) {
+            // If error on memcached, do not flip first flag.
+            // Finalize will never occur (no cache set).
+            if (err) return (err.key = key) && client.emit('error', err);
+
+            cached = encoded;
+            if (!first) {
+                finalize();
+            } else if (encoded) {
+                var data
+                try { decode(encoded); }
+                catch(err) { (err.key = key) && client.emit('error', err); }
+                if (data) callback(data.err, data.buffer, data.headers);
+            }
+            first = false;
+        });
+    };
+
+    function finalize() {
+        if (cached === current) return;
+        client.set(key, current, expires, function(err) {
+            if (!err) return;
+            err.key = key;
+            client.emit('error', err);
+        });
+    };
+
+    function readthrough(url, callback) {
         if (!options.client) return callback(new Error('No memcached client'));
         if (!options.expires) return callback(new Error('No expires option set'));
 

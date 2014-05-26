@@ -1,6 +1,7 @@
 var assert = require('assert');
 var Memsource = require('../index');
 var Memcached = Memsource.Memcached;
+var deadclient = new Memcached('127.0.0.1:11212');
 
 var Testsource = require('./testsource');
 var tiles = Testsource.tiles;
@@ -81,6 +82,7 @@ var error = function(message, cached, done) {
 describe('readthrough', function() {
     var source;
     var longsource;
+    var deadsource;
     var Source = Memsource({ expires: {
         long: 60000,
         test: 1
@@ -99,6 +101,17 @@ describe('readthrough', function() {
         new Source({hostname:'long'}, function(err, memsource) {
             if (err) throw err;
             longsource = memsource;
+            done();
+        });
+    });
+    before(function(done) {
+        var Dead = Memsource({ expires: {
+            long: 60000,
+            test: 1
+        }, mode:'race', client:deadclient }, Testsource);
+        new Dead({ delay:50 }, function(err, memsource) {
+            if (err) throw err;
+            deadsource = memsource;
             done();
         });
     });
@@ -150,6 +163,18 @@ describe('readthrough', function() {
     it('long grid 200 b miss', function(done) {
         longsource.getGrid(1, 0, 0, grid(grids.b, false, done));
     });
+    it('dead tile 200 a miss', function(done) {
+        deadsource.getTile(0, 0, 0, tile(tiles.a, false, done));
+    });
+    it('dead tile 200 b miss', function(done) {
+        deadsource.getTile(1, 0, 0, tile(tiles.b, false, done));
+    });
+    it('dead grid 200 a miss', function(done) {
+        deadsource.getGrid(0, 0, 0, grid(grids.a, false, done));
+    });
+    it('dead grid 200 b miss', function(done) {
+        deadsource.getGrid(1, 0, 0, grid(grids.b, false, done));
+    });
     describe('expires', function() {
         before(function(done) {
             setTimeout(done, 1000);
@@ -184,6 +209,18 @@ describe('readthrough', function() {
         it('long grid 200 b hit', function(done) {
             longsource.getGrid(1, 0, 0, grid(grids.b, true, done));
         });
+        it('dead tile 200 a miss', function(done) {
+            deadsource.getTile(0, 0, 0, tile(tiles.a, false, done));
+        });
+        it('dead tile 200 b miss', function(done) {
+            deadsource.getTile(1, 0, 0, tile(tiles.b, false, done));
+        });
+        it('dead grid 200 a miss', function(done) {
+            deadsource.getGrid(0, 0, 0, grid(grids.a, false, done));
+        });
+        it('dead grid 200 b miss', function(done) {
+            deadsource.getGrid(1, 0, 0, grid(grids.b, false, done));
+        });
     });
 });
 
@@ -191,6 +228,7 @@ describe('race', function() {
     var source;
     var longsource;
     var fastsource;
+    var deadsource;
     var Source = Memsource({ expires: {
         long: 60000,
         test: 1
@@ -219,6 +257,17 @@ describe('race', function() {
             done();
         });
     });
+    before(function(done) {
+        var Dead = Memsource({ expires: {
+            long: 60000,
+            test: 1
+        }, mode:'race', client:deadclient }, Testsource);
+        new Dead({ delay:50 }, function(err, memsource) {
+            if (err) throw err;
+            deadsource = memsource;
+            done();
+        });
+    });
     it('tile 200 a miss', function(done) {
         source.getTile(0, 0, 0, tile(tiles.a, false, done));
     });
@@ -279,6 +328,18 @@ describe('race', function() {
     it('long grid 200 b miss', function(done) {
         longsource.getGrid(1, 0, 0, grid(grids.b, false, done));
     });
+    it('dead tile 200 a miss', function(done) {
+        deadsource.getTile(0, 0, 0, tile(tiles.a, false, done));
+    });
+    it('dead tile 200 b miss', function(done) {
+        deadsource.getTile(1, 0, 0, tile(tiles.b, false, done));
+    });
+    it('dead grid 200 a miss', function(done) {
+        deadsource.getGrid(0, 0, 0, grid(grids.a, false, done));
+    });
+    it('dead grid 200 b miss', function(done) {
+        deadsource.getGrid(1, 0, 0, grid(grids.b, false, done));
+    });
     describe('expires', function() {
         before(function(done) {
             setTimeout(done, 1000);
@@ -312,6 +373,18 @@ describe('race', function() {
         });
         it('long grid 200 b hit', function(done) {
             longsource.getGrid(1, 0, 0, grid(grids.b, true, done));
+        });
+        it('dead tile 200 a miss', function(done) {
+            deadsource.getTile(0, 0, 0, tile(tiles.a, false, done));
+        });
+        it('dead tile 200 b miss', function(done) {
+            deadsource.getTile(1, 0, 0, tile(tiles.b, false, done));
+        });
+        it('dead grid 200 a miss', function(done) {
+            deadsource.getGrid(0, 0, 0, grid(grids.a, false, done));
+        });
+        it('dead grid 200 b miss', function(done) {
+            deadsource.getGrid(1, 0, 0, grid(grids.b, false, done));
         });
     });
 });

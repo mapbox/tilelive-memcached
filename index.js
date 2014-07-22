@@ -6,14 +6,6 @@ module.exports = function(options, Source) {
     if (!Source) throw new Error('No source provided');
     if (!Source.prototype.get) throw new Error('No get method found on source');
 
-    options = options || {};
-    options.client = ('client' in options) ? options.client : new Memcached('127.0.0.1:11211');
-    options.expires = ('expires' in options) ? options.expires : 300;
-    options.mode = ('mode' in options) ? options.mode : 'readthrough';
-
-    if (!options.client) throw new Error('No memcached client');
-    if (!options.expires) throw new Error('No expires option set');
-
     function Caching() { return Source.apply(this, arguments) };
 
     // Inheritance.
@@ -22,16 +14,34 @@ module.exports = function(options, Source) {
     // References for testing, convenience, post-call overriding.
     Caching.memcached = options;
 
+    Caching.prototype.get = module.exports.cachingGet(options, Source.prototype.get);
+
+    return Caching;
+};
+
+module.exports.cachingGet = function(options, get) {
+    if (!get) throw new Error('No get function provided');
+
+    options = options || {};
+    options.namespace = ('namespace' in options) ? options.namespace : 'TL';
+    options.client = ('client' in options) ? options.client : new Memcached('127.0.0.1:11211');
+    options.expires = ('expires' in options) ? options.expires : 300;
+    options.mode = ('mode' in options) ? options.mode : 'readthrough';
+
+    if (!options.client) throw new Error('No memcached client');
+    if (!options.expires) throw new Error('No expires option set');
+
+    var caching;
     if (options.mode === 'readthrough') {
-        Caching.prototype.get = readthrough;
+        caching = readthrough;
     } else if (options.mode === 'race') {
-        Caching.prototype.get = race;
+        caching = race;
     } else {
         throw new Error('Invalid value for options.mode ' + options.mode);
     }
 
     function race(url, callback) {
-        var key = 'TL-' + url;
+        var key = options.namespace + '-' + url;
         var source = this;
         var client = options.client;
         var expires;
@@ -46,7 +56,7 @@ module.exports = function(options, Source) {
         var current = null;
 
         // GET upstream.
-        Source.prototype.get.call(source, url, function(err, buffer, headers) {
+        get.call(source, url, function(err, buffer, headers) {
             current = encode(err, buffer, headers);
             if (cached && current) finalize();
             if (sent) return;
@@ -87,7 +97,7 @@ module.exports = function(options, Source) {
     };
 
     function readthrough(url, callback) {
-        var key = 'TL-' + url;
+        var key = options.namespace + '-' + url;
         var source = this;
         var client = options.client;
         var expires;
@@ -102,7 +112,7 @@ module.exports = function(options, Source) {
             if (err) {
                 err.key = key;
                 client.emit('error', err);
-                return Source.prototype.get.call(source, url, callback);
+                return get(url, callback);
             }
 
             // Cache hit.
@@ -116,7 +126,7 @@ module.exports = function(options, Source) {
             if (data) return callback(data.err, data.buffer, data.headers);
 
             // Cache miss, error, or otherwise no data
-            Source.prototype.get.call(source, url, function(err, buffer, headers) {
+            get.call(source, url, function(err, buffer, headers) {
                 if (err && err.status !== 404 && err.status !== 403) return callback(err);
                 callback(err, buffer, headers);
                 // Callback does not need to wait for memcached set to occur.
@@ -129,7 +139,7 @@ module.exports = function(options, Source) {
         });
     };
 
-    return Caching;
+    return caching;
 };
 
 module.exports.Memcached = Memcached;

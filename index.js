@@ -127,7 +127,7 @@ module.exports.cachingGet = function(namespace, options, get) {
 
             // Cache miss, error, or otherwise no data
             get.call(source, url, function(err, buffer, headers) {
-                if (err && err.status !== 404 && err.status !== 403) return callback(err);
+                if (err && !errcode(err)) return callback(err);
                 callback(err, buffer, headers);
                 // Callback does not need to wait for memcached set to occur.
                 client.set(key, encode(err, buffer, headers), expires, function(err) {
@@ -146,9 +146,17 @@ module.exports.Memcached = Memcached;
 module.exports.encode = encode;
 module.exports.decode = decode;
 
+function errcode(err) {
+    if (!err) return;
+    if (err.status === 404) return 404;
+    if (err.status === 403) return 403;
+    if (err.code === 404) return 404;
+    if (err.code === 403) return 403;
+    return;
+}
+
 function encode(err, buffer, headers) {
-    if (err && err.status === 404) return '404';
-    if (err && err.status === 403) return '403';
+    if (errcode(err)) return errcode(err).toString();
 
     // Unhandled error.
     if (err) return null;
@@ -170,6 +178,7 @@ function encode(err, buffer, headers) {
 function decode(encoded) {
     if (encoded === '404' || encoded === '403') {
         var err = new Error();
+        err.code = parseInt(encoded, 10);
         err.status = parseInt(encoded, 10);
         err.memcached = true;
         return { err: err };

@@ -153,10 +153,18 @@ function encode(err, buffer, headers) {
     // Unhandled error.
     if (err) return null;
 
-    // Turn strings into buffers.
-    if (buffer && !(buffer instanceof Buffer)) buffer = new Buffer(buffer);
+    headers = headers || {};
 
-    return JSON.stringify(headers || {}) + buffer.toString('base64');
+    // Turn objects into JSON string buffers.
+    if (buffer && typeof buffer === 'object' && !(buffer instanceof Buffer)) {
+        headers['x-memcached-json'] = true;
+        buffer = new Buffer(JSON.stringify(buffer));
+    // Turn strings into buffers.
+    } else if (buffer && !(buffer instanceof Buffer)) {
+        buffer = new Buffer(buffer);
+    }
+
+    return JSON.stringify(headers) + buffer.toString('base64');
 };
 
 function decode(encoded) {
@@ -174,6 +182,10 @@ function decode(encoded) {
     data.headers = JSON.parse(encoded.substr(0, breaker+1));
     data.headers['x-memcached'] = 'hit';
     data.buffer = new Buffer(encoded.substr(breaker), 'base64');
+
+    // Return JSON-encoded objects to true form.
+    if (data.headers['x-memcached-json']) data.buffer = JSON.parse(data.buffer);
+
     if (data.headers['content-length'] && data.headers['content-length'] != data.buffer.length)
         throw new Error('Content length does not match');
     return data;

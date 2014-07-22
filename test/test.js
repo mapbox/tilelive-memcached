@@ -401,3 +401,143 @@ describe('race', function() {
     });
 });
 
+describe('cachingGet', function() {
+    var stats = {};
+    var options = { mode: 'readthrough' };
+    var getter = function(id, callback) {
+        stats[id] = stats[id] || 0;
+        stats[id]++;
+
+        if (id === 'missing') {
+            var err = new Error('Not found');
+            err.code = 404;
+            return callback(err);
+        }
+        if (id === 'fatal') {
+            var err = new Error('Fatal');
+            err.code = 500;
+            return callback(err);
+        }
+        if (id === 'nocode') {
+            var err = new Error('Unexpected');
+            return callback(err);
+        }
+
+        return callback(null, {id:id});
+    };
+    var wrapped = Memsource.cachingGet('test', options, getter);
+    before(function(done) {
+        options.client.flush(done);
+    });
+    it('getter 200 miss', function(done) {
+        wrapped('asdf', function(err, data, headers) {
+            assert.ifError(err);
+            assert.deepEqual(data, {id:'asdf'}, 'returns data');
+            assert.ok(!headers, 'no headers');
+            assert.equal(stats.asdf, 1, 'asdf IO x1');
+            done();
+        });
+    });
+    it('getter 200 hit', function(done) {
+        wrapped('asdf', function(err, data, headers) {
+            assert.ifError(err);
+            assert.deepEqual(data, {id:'asdf'}, 'returns data');
+            assert.deepEqual(headers, {'x-memcached-json':true, 'x-memcached':'hit'}, 'headers, hit');
+            assert.equal(stats.asdf, 1, 'asdf IO x1');
+            done();
+        });
+    });
+    it('getter 404 miss', function(done) {
+        wrapped('missing', function(err, data, headers) {
+            assert.equal(err.toString(), 'Error: Not found', 'not found err');
+            assert.equal(err.code, 404, 'err code 404');
+            assert.ok(!headers, 'no headers');
+            assert.equal(stats.missing, 1, 'missing IO x1');
+            done();
+        });
+    });
+    it('getter 404 hit', function(done) {
+        wrapped('missing', function(err, data, headers) {
+            assert.equal(err.toString(), 'Error', 'not found err');
+            assert.equal(err.code, 404, 'err code 404');
+            assert.ok(!headers, 'no headers');
+            assert.equal(stats.missing, 1, 'missing IO x1');
+            done();
+        });
+    });
+    it('getter 500 miss', function(done) {
+        wrapped('fatal', function(err, data, headers) {
+            assert.equal(err.toString(), 'Error: Fatal', 'fatal err');
+            assert.equal(err.code, 500, 'err code 500');
+            assert.ok(!headers, 'no headers');
+            assert.equal(stats.fatal, 1, 'fatal IO x1');
+            done();
+        });
+    });
+    it('getter 500 miss', function(done) {
+        wrapped('fatal', function(err, data, headers) {
+            assert.equal(err.toString(), 'Error: Fatal', 'fatal err');
+            assert.equal(err.code, 500, 'err code 500');
+            assert.ok(!headers, 'no headers');
+            assert.equal(stats.fatal, 2, 'fatal IO x1');
+            done();
+        });
+    });
+    it('getter nocode', function(done) {
+        wrapped('nocode', function(err, data, headers) {
+            assert.equal(err.toString(), 'Error: Unexpected', 'unexpected err');
+            assert.equal(err.code, undefined, 'no err code');
+            assert.ok(!headers, 'no headers');
+            assert.equal(stats.nocode, 1, 'nocode IO x1');
+            done();
+        });
+    });
+    it('getter nocode', function(done) {
+        wrapped('nocode', function(err, data, headers) {
+            assert.equal(err.toString(), 'Error: Unexpected', 'unexpected err');
+            assert.equal(err.code, undefined, 'no err code');
+            assert.ok(!headers, 'no headers');
+            assert.equal(stats.nocode, 2, 'nocode IO x1');
+            done();
+        });
+    });
+});
+
+describe('unit', function() {
+    it('encode', function(done) {
+        var errcode404 = new Error(); errcode404.code = 404;
+        var errcode403 = new Error(); errcode403.code = 403;
+        var errcode500 = new Error(); errcode500.code = 500;
+        var errstat404 = new Error(); errstat404.status = 404;
+        var errstat403 = new Error(); errstat403.status = 403;
+        var errstat500 = new Error(); errstat500.status = 500;
+        assert.equal(Memsource.encode(errcode404), '404');
+        assert.equal(Memsource.encode(errcode403), '403');
+        assert.equal(Memsource.encode(errcode500), null);
+        assert.equal(Memsource.encode(errstat404), '404');
+        assert.equal(Memsource.encode(errstat403), '403');
+        assert.equal(Memsource.encode(errstat500), null);
+        assert.equal(Memsource.encode(null, {id:'foo'}), '{"x-memcached-json":true}eyJpZCI6ImZvbyJ9', 'encodes object');
+        assert.equal(Memsource.encode(null, 'hello world'), '{}aGVsbG8gd29ybGQ=', 'encodes string');
+        assert.equal(Memsource.encode(null, new Buffer(0)), '{}', 'encodes empty buffer');
+        done();
+    });
+    it('decode', function(done) {
+        assert.deepEqual(Memsource.decode('404'), {err:{code:404,status:404,memcached:true}});
+        assert.deepEqual(Memsource.decode('403'), {err:{code:403,status:403,memcached:true}});
+        assert.deepEqual(Memsource.decode('{"x-memcached-json":true}eyJpZCI6ImZvbyJ9'), {
+            headers:{'x-memcached-json':true,'x-memcached':'hit'},
+            buffer:{'id':'foo'}
+        }, 'decodes object');
+        assert.deepEqual(Memsource.decode('{}aGVsbG8gd29ybGQ='), {
+            headers:{'x-memcached':'hit'},
+            buffer:new Buffer('hello world')
+        }, 'decodes string (as buffer)');
+        assert.deepEqual(Memsource.decode('{}'), {
+            headers:{'x-memcached':'hit'},
+            buffer:new Buffer(0)
+        }, 'decodes buffer');
+        done();
+    });
+});
+

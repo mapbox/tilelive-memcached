@@ -14,16 +14,16 @@ module.exports = function(options, Source) {
     // References for testing, convenience, post-call overriding.
     Caching.memcached = options;
 
-    Caching.prototype.get = module.exports.cachingGet(options, Source.prototype.get);
+    Caching.prototype.get = module.exports.cachingGet('TL', options, Source.prototype.get);
 
     return Caching;
 };
 
-module.exports.cachingGet = function(options, get) {
+module.exports.cachingGet = function(namespace, options, get) {
     if (!get) throw new Error('No get function provided');
+    if (!namespace) throw new Error('No namespace provided');
 
     options = options || {};
-    options.namespace = ('namespace' in options) ? options.namespace : 'TL';
     options.client = ('client' in options) ? options.client : new Memcached('127.0.0.1:11211');
     options.expires = ('expires' in options) ? options.expires : 300;
     options.mode = ('mode' in options) ? options.mode : 'readthrough';
@@ -41,7 +41,7 @@ module.exports.cachingGet = function(options, get) {
     }
 
     function race(url, callback) {
-        var key = options.namespace + '-' + url;
+        var key = namespace + '-' + url;
         var source = this;
         var client = options.client;
         var expires;
@@ -97,7 +97,7 @@ module.exports.cachingGet = function(options, get) {
     };
 
     function readthrough(url, callback) {
-        var key = options.namespace + '-' + url;
+        var key = namespace + '-' + url;
         var source = this;
         var client = options.client;
         var expires;

@@ -8,13 +8,14 @@
     "url": "git://github.com/mapbox/tilelive-memcached.git"
   },
   "dependencies": {
-    "memcached": "0.2.6"
+    "memjs": "0.8.6"
   },
   "devDependencies": {
+    "buffer-equal": "0.0.x",
     "mocha": "1.3.x"
   },
   "scripts": {
-    "test": "mocha -R spec"
+    "test": "mocha -R spec --ignore-leaks"
   },
   "engines": {
     "node": "0.8.x || 0.10.x"

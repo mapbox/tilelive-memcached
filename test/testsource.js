@@ -24,7 +24,7 @@ function Testsource(uri, callback) {
         'get': 0
     };
     callback(null, this);
-};
+}
 Testsource.prototype.get = function(url, callback) {
     var stat = this.stat;
 
@@ -84,8 +84,8 @@ Testsource.prototype.get = function(url, callback) {
                 'last-modified': now.toUTCString()
             });
         default:
-            var err = new Error;
-            err.status = 404;
+            var err = new Error('Not found');
+            err.statusCode = 404;
             return callback(err);
         }
     }
@@ -93,7 +93,6 @@ Testsource.prototype.get = function(url, callback) {
 Testsource.prototype.getTile = function(z, x, y, callback) {
     this.get('http://' + this.hostname + '/' + [z,x,y].join('/') + '.png', function(err, buffer, headers) {
         if (err) {
-            err.message = err.message || 'Tile does not exist';
             return callback(err);
         }
         return callback(null, buffer, headers);
@@ -102,7 +101,6 @@ Testsource.prototype.getTile = function(z, x, y, callback) {
 Testsource.prototype.getGrid = function(z, x, y, callback) {
     this.get('http://' + this.hostname + '/' + [z,x,y].join('/') + '.grid.json', function(err, buffer, headers) {
         if (err) {
-            err.message = err.message || 'Grid does not exist';
             return callback(err);
         }
         return callback(null, JSON.parse(buffer), headers);

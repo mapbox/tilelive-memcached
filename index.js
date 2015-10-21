@@ -27,7 +27,7 @@ module.exports.cachingGet = function(namespace, options, get) {
     options.client = ('client' in options) ? options.client : memjs.Client.create(null, {'keepAlive': true});
     options.expires = ('expires' in options) ? options.expires : 300;
     options.mode = ('mode' in options) ? options.mode : 'readthrough';
-    options.logger = ('logger' in options) ? options.logger: console.warn;
+    options.logger = ('logger' in options) ? options.logger: console;
 
     if (!options.client) throw new Error('No memcached client');
     if (!options.expires) throw new Error('No expires option set');
@@ -71,7 +71,7 @@ module.exports.cachingGet = function(namespace, options, get) {
             // Finalize will never occur (no cache set).
             if (err) {
                 err.key = key;
-                return options.logger('error', err);
+                return options.logger.log(err);
             }
 
             cached = encoded || '500';
@@ -82,7 +82,7 @@ module.exports.cachingGet = function(namespace, options, get) {
                 data = decode(cached);
             } catch(e) {
                 e.key = key;
-                options.logger('error', e);
+                options.logger.log(e);
                 cached = '500';
             }
             if (data) {
@@ -96,7 +96,7 @@ module.exports.cachingGet = function(namespace, options, get) {
             client.set(key, current, function(err) {
                 if (err) {
                     err.key = key;
-                    options.logger('error', err);
+                    options.logger.log(err);
                 }
             }, expires);
         }
@@ -117,7 +117,7 @@ module.exports.cachingGet = function(namespace, options, get) {
             // without attempting a set after retrieval.
             if (err) {
                 err.key = key;
-                options.logger('error', err);
+                options.logger.log(err);
                 return get(url, callback);
             }
 
@@ -127,7 +127,7 @@ module.exports.cachingGet = function(namespace, options, get) {
                 data = decode(encoded);
             } catch(e) {
                 e.key = key;
-                options.logger('error', e);
+                options.logger.log(e);
             }
             if (data) return callback(data.err, data.buffer, data.headers);
 
@@ -140,7 +140,7 @@ module.exports.cachingGet = function(namespace, options, get) {
                 client.set(key, encode(err, buffer, headers), function(err) {
                     if (!err) return;
                     err.key = key;
-                    options.logger('error', err);
+                    options.logger.log(err);
                 }, expires);
             });
         });

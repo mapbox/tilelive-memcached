@@ -8,6 +8,7 @@ node-tilejson wrapping source for tilelive.
         mode: 'readthrough', // optional, cache mode either 'readthrough' or 'race'
         client: client, // optional, instantiated memcached client
         expires: 600    // optional, object expiration time in seconds
+        ttl: 300        // optional, relay mode only, numbe of seconds before an object should be re-checked.
     };
     var TileJSON = require('tilelive-memcached')(options, require('tilejson'));
 

@@ -1,12 +1,12 @@
 var urlParse = require('url').parse;
 var util = require('util');
-var Memcached = require('memcached');
+var memjs = require('memjs');
 
 module.exports = function(options, Source) {
     if (!Source) throw new Error('No source provided');
     if (!Source.prototype.get) throw new Error('No get method found on source');
 
-    function Caching() { return Source.apply(this, arguments) };
+    function Caching() { return Source.apply(this, arguments); }
 
     // Inheritance.
     util.inherits(Caching, Source);
@@ -24,9 +24,10 @@ module.exports.cachingGet = function(namespace, options, get) {
     if (!namespace) throw new Error('No namespace provided');
 
     options = options || {};
-    options.client = ('client' in options) ? options.client : new Memcached('127.0.0.1:11211');
+    options.client = ('client' in options) ? options.client : memjs.Client.create(null, {'keepAlive': true});
     options.expires = ('expires' in options) ? options.expires : 300;
     options.mode = ('mode' in options) ? options.mode : 'readthrough';
+    options.logger = ('logger' in options) ? options.logger: console;
 
     if (!options.client) throw new Error('No memcached client');
     if (!options.expires) throw new Error('No expires option set');
@@ -68,7 +69,10 @@ module.exports.cachingGet = function(namespace, options, get) {
         client.get(key, function(err, encoded) {
             // If error on memcached, do not flip first flag.
             // Finalize will never occur (no cache set).
-            if (err) return (err.key = key) && client.emit('error', err);
+            if (err) {
+                err.key = key;
+                return options.logger.log(err);
+            }
 
             cached = encoded || '500';
             if (cached && current) finalize();
@@ -76,8 +80,9 @@ module.exports.cachingGet = function(namespace, options, get) {
             var data;
             try {
                 data = decode(cached);
-            } catch(err) {
-                (err.key = key) && client.emit('error', err);
+            } catch(e) {
+                e.key = key;
+                options.logger.log(e);
                 cached = '500';
             }
             if (data) {
@@ -88,13 +93,14 @@ module.exports.cachingGet = function(namespace, options, get) {
 
         function finalize() {
             if (cached === current) return;
-            client.set(key, current, expires, function(err) {
-                if (!err) return;
-                err.key = key;
-                client.emit('error', err);
-            });
+            client.set(key, current, function(err) {
+                if (err) {
+                    err.key = key;
+                    options.logger.log(err);
+                }
+            }, expires);
         }
-    };
+    }
 
     function readthrough(url, callback) {
         var key = namespace + '-' + url;
@@ -111,7 +117,7 @@ module.exports.cachingGet = function(namespace, options, get) {
             // without attempting a set after retrieval.
             if (err) {
                 err.key = key;
-                client.emit('error', err);
+                options.logger.log(err);
                 return get(url, callback);
             }
 
@@ -119,9 +125,9 @@ module.exports.cachingGet = function(namespace, options, get) {
             var data;
             if (encoded) try {
                 data = decode(encoded);
-            } catch(err) {
-                err.key = key;
-                client.emit('error', err);
+            } catch(e) {
+                e.key = key;
+                options.logger.log(e);
             }
             if (data) return callback(data.err, data.buffer, data.headers);
 
@@ -129,29 +135,28 @@ module.exports.cachingGet = function(namespace, options, get) {
             get.call(source, url, function(err, buffer, headers) {
                 if (err && !errcode(err)) return callback(err);
                 callback(err, buffer, headers);
+
                 // Callback does not need to wait for memcached set to occur.
-                client.set(key, encode(err, buffer, headers), expires, function(err) {
+                client.set(key, encode(err, buffer, headers), function(err) {
                     if (!err) return;
                     err.key = key;
-                    client.emit('error', err);
-                });
+                    options.logger.log(err);
+                }, expires);
             });
         });
-    };
+    }
 
     return caching;
 };
 
-module.exports.Memcached = Memcached;
+module.exports.memjs = memjs;
 module.exports.encode = encode;
 module.exports.decode = decode;
 
 function errcode(err) {
     if (!err) return;
-    if (err.status === 404) return 404;
-    if (err.status === 403) return 403;
-    if (err.code === 404) return 404;
-    if (err.code === 403) return 403;
+    if (err.statusCode === 404) return 404;
+    if (err.statusCode === 403) return 403;
     return;
 }
 
@@ -172,25 +177,42 @@ function encode(err, buffer, headers) {
         buffer = new Buffer(buffer);
     }
 
-    return JSON.stringify(headers) + buffer.toString('base64');
-};
+    headers = new Buffer(JSON.stringify(headers), 'utf8');
 
-function decode(encoded) {
-    if (encoded === '404' || encoded === '403') {
-        var err = new Error();
-        err.code = parseInt(encoded, 10);
-        err.status = parseInt(encoded, 10);
-        err.memcached = true;
-        return { err: err };
+    if (headers.length > 1024) {
+        throw new Error('Invalid cache value - headers exceed 1024 bytes: ' + JSON.stringify(headers));
     }
 
-    var breaker = encoded.indexOf('}');
-    if (breaker === -1) return new Error('Invalid cache value');
+    var padding = new Buffer(1024 - headers.length);
+    padding.fill(' ');
+    var len = headers.length + padding.length + buffer.length;
+    return Buffer.concat([headers, padding, buffer], len);
+}
 
+function decode(encoded) {
+    if (encoded.length == 3) {
+        encoded = encoded.toString();
+        if (encoded === '404' || encoded === '403') {
+            var err = new Error(encoded === '404' ? 'Not found' : 'forbidden');
+            err.statusCode = parseInt(encoded, 10);
+            err.memcached = true;
+            return { err: err };
+        }
+    }
+
+    // First 1024 bytes reserved for header + padding.
+    var offset = 1024;
     var data = {};
-    data.headers = JSON.parse(encoded.substr(0, breaker+1));
+    data.headers = encoded.slice(0, offset).toString().trim();
+
+    try {
+        data.headers = JSON.parse(data.headers);
+    } catch(e) {
+        throw new Error('Invalid cache value');
+    }
+
     data.headers['x-memcached'] = 'hit';
-    data.buffer = new Buffer(encoded.substr(breaker), 'base64');
+    data.buffer = encoded.slice(offset);
 
     // Return JSON-encoded objects to true form.
     if (data.headers['x-memcached-json']) data.buffer = JSON.parse(data.buffer);
@@ -198,5 +220,4 @@ function decode(encoded) {
     if (data.headers['content-length'] && data.headers['content-length'] != data.buffer.length)
         throw new Error('Content length does not match');
     return data;
-};
-
+}

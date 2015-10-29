@@ -1,3 +1,7 @@
+## 1.0.1
+
+- Adding 'relay' cache mode which serves available but stale data while refreshing in the background.
+
 ## 1.0.0
 
 - Switched to binary client.

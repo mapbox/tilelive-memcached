@@ -406,6 +406,7 @@ describe('relay', function() {
     var source;
     var longsource;
     var deadsource;
+    var stalesource;
     var Source = Memsource({
         expires: {
             long: 60000,
